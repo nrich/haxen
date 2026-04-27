@@ -69,6 +69,10 @@ def _index_to_ascii_position(idx: int, bytes_per_line: int, left_offset: int) ->
 
     return [y, x]
 
+def _spinning_cursor():
+    while True:
+        for cursor in '|/-\\':
+            yield cursor
 
 def main(stdscr) -> None:
     """The main entry point."""
@@ -393,18 +397,43 @@ def main(stdscr) -> None:
                         search_start_position: int = file_offset + cursor_position + jump_offset + 1
                         search_stop_position: int = search_start_position + (20*1024*1024)
 
+                        search_win.erase()
                         if ascii_search:
-                            new_position = fm.find(ascii_search, search_start_position, search_stop_position)
-                            while new_position == -1:
-                                search_start_position = search_stop_position
-                                if search_start_position > file_size:
-                                    break
-                                search_stop_position = search_start_position + (20*1024*1024)
+                            spinner = _spinning_cursor()
+
+                            search_progress_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                            search_progress_win.box()
+                            search_progress_win.addstr(0, 24, "Searching...")
+
+                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                            search_progress_win.refresh()
+
+                            try:
+                                new_position = fm.find(ascii_search, search_start_position, search_stop_position)
+                                while new_position == -1:
+                                    search_start_position = search_stop_position
+                                    if search_start_position > file_size:
+                                        break
+
+                                    search_stop_position = search_start_position + (20*1024*1024)
+                                    new_position = fm.find(ascii_search, search_start_position, search_stop_position)
+                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                                    search_progress_win.refresh()
+
+                                if new_position != -1:
+                                    cursor_position = new_position % bytes_per_screen
+                                    file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                                else:
+                                    search_progress_win.addstr(1, 2, " " * 57)
+                                    search_progress_win.addstr(1, 2, f"Not found.")
+                                    search_progress_win.getch()
+                            except KeyboardInterrupt:
+                                ascii_search = ''
+                                search_progress_win.addstr(1, 2, " " * 57)
+                                search_progress_win.addstr(1, 2, f"Search cancelled.")
+                                search_progress_win.getch()
 
 
-                            if new_position != -1:
-                                cursor_position = new_position % bytes_per_screen
-                                file_offset = (new_position // bytes_per_screen) * bytes_per_screen
                     else:
                         search_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
                         search_win.box()
@@ -421,11 +450,46 @@ def main(stdscr) -> None:
                                 hex_search = b''
                         curses.noecho()
 
-                        real_position: int = file_offset + cursor_position + jump_offset
-                        new_position = fm.find(hex_search, real_position+1) 
-                        if hex_search and new_position != -1:
-                            cursor_position = new_position % bytes_per_screen
-                            file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+
+                        search_start_position: int = file_offset + cursor_position + jump_offset + 1
+                        search_stop_position: int = search_start_position + (20*1024*1024)
+
+                        search_win.erase()
+                        if hex_search:
+                            spinner = _spinning_cursor()
+
+                            search_progress_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                            search_progress_win.box()
+                            search_progress_win.addstr(0, 24, "Searching...")
+
+                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                            search_progress_win.refresh()
+
+                            try:
+                                new_position = fm.find(hex_search, search_start_position, search_stop_position)
+                                while new_position == -1:
+                                    search_start_position = search_stop_position
+                                    if search_start_position > file_size:
+                                        break
+
+                                    search_stop_position = search_start_position + (20*1024*1024)
+                                    new_position = fm.find(hex_search, search_start_position, search_stop_position)
+                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                                    search_progress_win.refresh()
+
+                                if new_position != -1:
+                                    cursor_position = new_position % bytes_per_screen
+                                    file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                                else:
+                                    search_progress_win.addstr(1, 2, " " * 57)
+                                    search_progress_win.addstr(1, 2, f"Not found.")
+                                    search_progress_win.getch()
+                            except KeyboardInterrupt:
+                                hex_search = b''
+                                search_progress_win.addstr(1, 2, " " * 57)
+                                search_progress_win.addstr(1, 2, f"Search cancelled.")
+                                search_progress_win.getch()
+
 
                 elif keypress == 108:
                     byteorder = 'little' if byteorder == 'big' else 'big'
