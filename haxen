@@ -166,8 +166,8 @@ def main(stdscr) -> None:
 
     marks: List[int] = []
 
-    with open(args.binfile, 'rb+') as fh:
-        with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_WRITE) as fm:
+    with open(args.binfile, 'rb') as fh:
+        with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as fm:
             while True:
                 data_offset: int = file_offset + cursor_position
 
@@ -390,11 +390,21 @@ def main(stdscr) -> None:
                             ascii_search = new_ascii_search
                         curses.noecho()
 
-                        real_position: int = file_offset + cursor_position + jump_offset
-                        new_position = fm.find(ascii_search, real_position+1) 
-                        if ascii_search and new_position != -1:
-                            cursor_position = new_position % bytes_per_screen
-                            file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                        search_start_position: int = file_offset + cursor_position + jump_offset + 1
+                        search_stop_position: int = search_start_position + (20*1024*1024)
+
+                        if ascii_search:
+                            new_position = fm.find(ascii_search, search_start_position, search_stop_position)
+                            while new_position == -1:
+                                search_start_position = search_stop_position
+                                if search_start_position > file_size:
+                                    break
+                                search_stop_position = search_start_position + (20*1024*1024)
+
+
+                            if new_position != -1:
+                                cursor_position = new_position % bytes_per_screen
+                                file_offset = (new_position // bytes_per_screen) * bytes_per_screen
                     else:
                         search_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
                         search_win.box()
