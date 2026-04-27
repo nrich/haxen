@@ -75,7 +75,7 @@ def main(stdscr) -> None:
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-v', '--verbose', help='Verbose output', action='store_true', dest='verbose')
     argparser.add_argument('-q', '--quiet', help='Quiet output', action='store_true', dest='quiet')
-    argparser.add_argument('-d', '--debug', help='Debug mode', action='store_true', dest='quiet')
+    argparser.add_argument('-d', '--debug', help='Debug mode', action='store_true', dest='debug')
     argparser.add_argument('binfile', help='Input binary file', type=str)
     args = argparser.parse_args()
 
