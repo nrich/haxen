@@ -200,6 +200,15 @@ def main(stdscr) -> None:
                     dump_win.addstr(i+1, 1, f'{offset:0{offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
                     dump_win.addstr(i+1, data_line_length+offset_address_size+3, f'{_buffer_as_print(hex_data)}')
 
+                if mode == 0:
+                    sy, sx = _index_to_ascii_position(cursor_position, bytes_per_line, offset_address_size)
+                    real_position: int = file_offset + cursor_position
+                    dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_REVERSE)
+                else:
+                    sy, sx = _index_to_position(cursor_position, bytes_per_line, offset_address_size)
+                    real_position: int = file_offset + cursor_position
+                    dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_REVERSE)
+
                 screen_start_offset: int = file_offset
                 bytes_per_screen: int = bytes_per_line * (dump_win_height-2)
 
