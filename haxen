@@ -494,4 +494,7 @@ def main(stdscr) -> None:
 
 
 if __name__ == "__main__":
-    wrapper(main)
+    try:
+        wrapper(main)
+    except KeyboardInterrupt:
+        pass
