@@ -84,6 +84,70 @@ def _spinning_cursor():
     while True:
         yield from '|/-\\'
 
+
+class ScreenSizing:
+    """Screen display sizing."""
+
+    def __init__(self, stdscr: curses.window, file_size: int):
+        height, width = stdscr.getmaxyx()
+
+        self.data_win_width: int = 42
+        self.data_win_height: int = height // 3
+
+        self.dump_win_width: int = width - self.data_win_width
+        self.dump_win_height: int = height
+
+        self.mark_win_width: int = 42
+        self.mark_win_height: int = height // 3
+
+        self.eval_win_width: int = 42
+        self.eval_win_height: int = height // 3
+
+        if file_size > 2**32:
+            self.offset_address_size: int = 12
+        else:
+            self.offset_address_size: int = 8
+
+        self.cursor_position: int = 0
+
+    @property
+    def bytes_per_line(self) -> int:
+        """Number of bytes per line to display."""
+
+        bytes_per_line: int = (self.dump_win_width - self.offset_address_size) // 4
+
+        cy,_ =  _index_to_position(bytes_per_line, bytes_per_line, self.offset_address_size)
+
+        if cy > 1:
+            bytes_per_line -= 4
+        bytes_per_line -= (bytes_per_line % 4)
+
+        return bytes_per_line
+
+    @property
+    def hex_offset(self) -> int:
+        """Screen offset where hex bytes begin."""
+
+        return self.offset_address_size + 3
+
+    @property
+    def ascii_offset(self) -> int:
+        """Screen offset where ascii begins."""
+
+        bytes_per_line: int = self.bytes_per_line
+
+        return (bytes_per_line * 3 + (bytes_per_line // 4)) + self.hex_offset
+
+    @property
+    def data_line_length(self) -> int:
+        """Lendth of single ling disply of hex bytes."""
+        return (self.bytes_per_line * 3) + (self.bytes_per_line // 4)
+
+    @property
+    def bytes_per_screen(self) -> int:
+        """Maximum number of bytes displayed on the screen."""
+        return self.bytes_per_line * (self.dump_win_height-2)
+
 def main(stdscr) -> None:
     """The main entry point."""
     argparser = argparse.ArgumentParser()
@@ -102,32 +166,22 @@ def main(stdscr) -> None:
         logging.basicConfig(level=logging.INFO, format='[%(process)d] (%(funcName)s) %(message)s')
 
     stdscr.clear()
-    height, width = stdscr.getmaxyx()
 
-    data_win_width: int = 42
-    data_win_height: int = height // 3
+    file_size: int = os.path.getsize(args.binfile)
+    screen_sizing = ScreenSizing(stdscr, file_size)
 
-    dump_win_width: int = width - data_win_width
-    dump_win_height: int = height
-
-    mark_win_width: int = 42
-    mark_win_height: int = height // 3
-
-    eval_win_width: int = 42
-    eval_win_height: int = height // 3
-
-    dump_win = curses.newwin(dump_win_height, dump_win_width, 0, 0)
+    dump_win = curses.newwin(screen_sizing.dump_win_height, screen_sizing.dump_win_width, 0, 0)
     dump_win.box()
 
-    data_win = curses.newwin(data_win_height, data_win_width, 0, dump_win_width+0)
+    data_win = curses.newwin(screen_sizing.data_win_height, screen_sizing.data_win_width, 0, screen_sizing.dump_win_width)
 
-    mark_win = curses.newwin(mark_win_height, mark_win_width, data_win_height, dump_win_width+0)
+    mark_win = curses.newwin(screen_sizing.mark_win_height, screen_sizing.mark_win_width, screen_sizing.data_win_height, screen_sizing.dump_win_width)
     mark_win.box()
-    mark_win.addstr(0, (mark_win_width>>1) - 4, 'File marks')
+    mark_win.addstr(0, (screen_sizing.mark_win_width // 2) - 4, 'File marks')
 
-    eval_win = curses.newwin(eval_win_height, eval_win_width, data_win_height+mark_win_height, dump_win_width+0)
+    eval_win = curses.newwin(screen_sizing.eval_win_height, screen_sizing.eval_win_width, screen_sizing.data_win_height+screen_sizing.mark_win_height, screen_sizing.dump_win_width+0)
     eval_win.box()
-    eval_win.addstr(0, (eval_win_width>>1) - 4, 'Eval')
+    eval_win.addstr(0, (screen_sizing.eval_win_width // 2) - 4, 'Eval')
 
     # Refresh to display changes
     stdscr.refresh()
@@ -136,25 +190,7 @@ def main(stdscr) -> None:
     mark_win.refresh()
     eval_win.refresh()
 
-
-    file_size: int = os.path.getsize(args.binfile)
-
-    if file_size > 2**32:
-        offset_address_size: int = 12
-    else:
-        offset_address_size: int = 8
-
-    bytes_per_line: int = (dump_win_width - offset_address_size) // 4
-    cy,_ =  _index_to_position(bytes_per_line, bytes_per_line, offset_address_size)
-    if cy > 1:
-        bytes_per_line -= 4
-    bytes_per_line -= (bytes_per_line % 4)
-
-    hex_offset = offset_address_size + 3
-    ascii_offset = (bytes_per_line * 3 + (bytes_per_line // 4)) + hex_offset
-
     cursor_position = 0
-
     file_offset = 0
 
     modes = [
@@ -181,40 +217,36 @@ def main(stdscr) -> None:
                 data_offset: int = file_offset + cursor_position
 
                 dump_win.box() # Uses default characters
-                dump_win.addstr(0, dump_win_width>>1, os.path.basename(args.binfile))
-                dump_win.addstr(dump_win_height-1, 4, f' 0x{data_offset:X}/0x{file_size:X}  {int((data_offset)/file_size * 100):3d}%')
+                dump_win.addstr(0, screen_sizing.dump_win_width//2, os.path.basename(args.binfile))
+                dump_win.addstr(screen_sizing.dump_win_height-1, 4, f' 0x{data_offset:X}/0x{file_size:X}  {int((data_offset)/file_size * 100):3d}%')
 
                 data_win.box()
-                data_win.addstr(0, (data_win_width>>1) - 4, f'Data ({byteorder})')
+                data_win.addstr(0, (screen_sizing.data_win_width//2) - 4, f'Data ({byteorder})')
 
                 if mode == 1:
-                    cy, cx = _index_to_ascii_position(cursor_position, bytes_per_line, offset_address_size)
+                    cy, cx = _index_to_ascii_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                 else:
-                    cy, cx = _index_to_position(cursor_position, bytes_per_line, offset_address_size)
+                    cy, cx = _index_to_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
 
                 stdscr.move(cy, cx)
                 cy, cx = stdscr.getyx()
 
-                data_line_length = (bytes_per_line * 3) + (bytes_per_line // 4)
+                for i in range(0, screen_sizing.dump_win_height-2):
+                    offset: int = i * screen_sizing.bytes_per_line + file_offset
 
-                for i in range(0, dump_win_height-2):
-                    offset: int = i * bytes_per_line + file_offset
+                    hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
-                    hex_data = fm[offset:offset+bytes_per_line]
-
-                    dump_win.addstr(i+1, 1, f'{offset:0{offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
-                    dump_win.addstr(i+1, data_line_length+offset_address_size+3, f'{_buffer_as_print(hex_data)}')
+                    dump_win.addstr(i+1, 1, f'{offset:0{screen_sizing.offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
+                    dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_print(hex_data)}')
 
                 if mode == 0:
-                    sy, sx = _index_to_ascii_position(cursor_position, bytes_per_line, offset_address_size)
+                    sy, sx = _index_to_ascii_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = file_offset + cursor_position
                     dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_REVERSE)
                 else:
-                    sy, sx = _index_to_position(cursor_position, bytes_per_line, offset_address_size)
+                    sy, sx = _index_to_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = file_offset + cursor_position
                     dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_REVERSE)
-
-                bytes_per_screen: int = bytes_per_line * (dump_win_height-2)
 
                 int8 = int.from_bytes(fm[data_offset:data_offset+1], byteorder=byteorder, signed=True)
                 uint8 = int.from_bytes(fm[data_offset:data_offset+1], byteorder=byteorder, signed=False)
@@ -243,7 +275,7 @@ def main(stdscr) -> None:
 
 
                 mark_win.box()
-                mark_win.addstr(0, (mark_win_width>>1) - 4, 'File marks')
+                mark_win.addstr(0, (screen_sizing.mark_win_width>>1) - 4, 'File marks')
                 for i,mark in enumerate(marks):
                     mark_win.addstr(1+i, 1, f'0x{mark:012X}    {(data_offset-mark):22d}')
 
@@ -254,10 +286,10 @@ def main(stdscr) -> None:
                         eval_data = struct.unpack(struct_eval, fm[real_position:real_position+eval_size])
                         for i,data in enumerate(eval_data):
                             if isinstance(data, bytes):
-                                eval_win.addstr(2+i, 1, ' ' * (eval_win_width-4))
+                                eval_win.addstr(2+i, 1, ' ' * (screen_sizing.eval_win_width-4))
                                 eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_print(data)}')
                             else:
-                                eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{eval_win_width-8}d}')
+                                eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{screen_sizing.eval_win_width-8}d}')
                     except:
                         eval_win.addstr(2, 1, '*Error*')
 
@@ -270,41 +302,41 @@ def main(stdscr) -> None:
                 keypress = stdscr.getch()
                 if keypress == curses.KEY_DOWN:
                     # down
-                    if cy > (dump_win_height-3):
-                        file_offset += bytes_per_line
+                    if cy > (screen_sizing.dump_win_height-3):
+                        file_offset += screen_sizing.bytes_per_line
                     else:
-                        cursor_position += bytes_per_line
+                        cursor_position += screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_UP:
                     # up
 
                     if cy < 2:
-                        file_offset -= bytes_per_line
+                        file_offset -= screen_sizing.bytes_per_line
                     else:
-                        cursor_position -= bytes_per_line
+                        cursor_position -= screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_LEFT:
                     # left
                     cursor_position -= 1
                     if cy < 2:
                         if mode == 0:
-                            if cx <= hex_offset:
-                                file_offset -= bytes_per_line
-                                cursor_position += bytes_per_line
+                            if cx <= screen_sizing.hex_offset:
+                                file_offset -= screen_sizing.bytes_per_line
+                                cursor_position += screen_sizing.bytes_per_line
                         else:
-                            if cx <= ascii_offset:
-                                file_offset -= bytes_per_line
-                                cursor_position += bytes_per_line
+                            if cx <= screen_sizing.ascii_offset:
+                                file_offset -= screen_sizing.bytes_per_line
+                                cursor_position += screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_RIGHT:
                     # right
                     cursor_position += 1
-                    if cy > (dump_win_height-3):
+                    if cy > (screen_sizing.dump_win_height-3):
                         if mode == 0:
-                            if cx >= ascii_offset - 4:
-                                file_offset += bytes_per_line
-                                cursor_position -= bytes_per_line
+                            if cx >= screen_sizing.ascii_offset - 4:
+                                file_offset += screen_sizing.bytes_per_line
+                                cursor_position -= screen_sizing.bytes_per_line
                         else:
-                            if cx > ascii_offset + bytes_per_line - 2:
-                                file_offset += bytes_per_line
-                                cursor_position -= bytes_per_line
+                            if cx > screen_sizing.ascii_offset + screen_sizing.bytes_per_line - 2:
+                                file_offset += screen_sizing.bytes_per_line
+                                cursor_position -= screen_sizing.bytes_per_line
 
                 elif keypress == 9:
                     # switch window
@@ -312,11 +344,11 @@ def main(stdscr) -> None:
                     mode %= len(modes)
                 elif keypress == curses.KEY_NPAGE:
                     # next screen
-                    file_offset += bytes_per_screen
+                    file_offset += screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress == curses.KEY_PPAGE:
                     # previous screen
-                    file_offset -= bytes_per_screen
+                    file_offset -= screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress in [44, 60]:
                     # jump to start
@@ -325,13 +357,13 @@ def main(stdscr) -> None:
                     dump_win.clear()
                 elif keypress in [46, 62]:
                     # jump to end
-                    file_offset = file_size // (bytes_per_line * dump_win_height-2) * (bytes_per_line * dump_win_height-2)
-                    cursor_position = file_size % (bytes_per_line * dump_win_height-2)
+                    file_offset = file_size // (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2) * (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
+                    cursor_position = file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
                     cursor_position -= 1
                     dump_win.clear()
                 elif keypress == 10:
                     # Jump to position
-                    jump_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                    jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Jump to position")
                     jump_win.addstr(1, 2, "0x")
@@ -347,13 +379,13 @@ def main(stdscr) -> None:
                         if jump_location > file_size:
                             raise ValueError('Invalid jump location')
 
-                        cursor_position = jump_location % bytes_per_screen
-                        file_offset = (jump_location // bytes_per_screen) * bytes_per_screen
+                        cursor_position = jump_location % screen_sizing.bytes_per_screen
+                        file_offset = (jump_location // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                     except:
                         pass
                 elif keypress == 106:
                     # set jump
-                    jump_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                    jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Set Jump Offset")
                     jump_win.addstr(1, 2, "")
@@ -369,7 +401,7 @@ def main(stdscr) -> None:
                         jump_offset = 0
                 elif keypress == 74:
                     # set jump
-                    jump_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                    jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Set Jump Offset")
                     jump_win.addstr(1, 2, "0x")
@@ -387,14 +419,14 @@ def main(stdscr) -> None:
                     # repeat jump
                     try:
                         real_position: int = file_offset + cursor_position + jump_offset
-                        cursor_position = real_position % bytes_per_screen
-                        file_offset = (real_position // bytes_per_screen) * bytes_per_screen
+                        cursor_position = real_position % screen_sizing.bytes_per_screen
+                        file_offset = (real_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                     except:
                         pass
                 elif keypress == 47:
                     # search
                     if mode == 1:
-                        search_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                        search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                         search_win.box()
                         search_win.addstr(0, 19, "ASCII string to search")
                         search_win.addstr(1, 2, "")
@@ -413,11 +445,11 @@ def main(stdscr) -> None:
                         if ascii_search:
                             spinner = _spinning_cursor()
 
-                            search_progress_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                            search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                             search_progress_win.box()
                             search_progress_win.addstr(0, 24, "Searching...")
 
-                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                             search_progress_win.refresh()
 
                             try:
@@ -429,12 +461,12 @@ def main(stdscr) -> None:
 
                                     search_stop_position = search_start_position + (20*1024*1024)
                                     new_position = fm.find(ascii_search, search_start_position, search_stop_position)
-                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                                     search_progress_win.refresh()
 
                                 if new_position != -1:
-                                    cursor_position = new_position % bytes_per_screen
-                                    file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                                    cursor_position = new_position % screen_sizing.bytes_per_screen
+                                    file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
                                     search_progress_win.addstr(1, 2, "Not found.")
@@ -447,7 +479,7 @@ def main(stdscr) -> None:
 
 
                     else:
-                        search_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                        search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                         search_win.box()
                         search_win.addstr(0, 20, "Hex value to search")
                         search_win.addstr(1, 2, "0x")
@@ -470,11 +502,11 @@ def main(stdscr) -> None:
                         if hex_search:
                             spinner = _spinning_cursor()
 
-                            search_progress_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                            search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                             search_progress_win.box()
                             search_progress_win.addstr(0, 24, "Searching...")
 
-                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                             search_progress_win.refresh()
 
                             try:
@@ -486,12 +518,12 @@ def main(stdscr) -> None:
 
                                     search_stop_position = search_start_position + search_block_size
                                     new_position = fm.find(hex_search, search_start_position, search_stop_position)
-                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
+                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                                     search_progress_win.refresh()
 
                                 if new_position != -1:
-                                    cursor_position = new_position % bytes_per_screen
-                                    file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                                    cursor_position = new_position % screen_sizing.bytes_per_screen
+                                    file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
                                     search_progress_win.addstr(1, 2, "Not found.")
@@ -527,8 +559,8 @@ def main(stdscr) -> None:
 
                         new_position: int = next_positions[-1] if next_positions else marks[-1]
 
-                        cursor_position = new_position % bytes_per_screen
-                        file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                        cursor_position = new_position % screen_sizing.bytes_per_screen
+                        file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
 
                 elif keypress == 99:
                     # jump to next mark
@@ -538,11 +570,11 @@ def main(stdscr) -> None:
 
                         new_position: int = next_positions[0] if next_positions else marks[0]
 
-                        cursor_position = new_position % bytes_per_screen
-                        file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                        cursor_position = new_position % screen_sizing.bytes_per_screen
+                        file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 72:
                     # struct eval
-                    struct_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
+                    struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     struct_win.box()
                     struct_win.addstr(1, 2, struct_eval)
                     char = struct_win.getch()
@@ -564,8 +596,8 @@ def main(stdscr) -> None:
                         real_position: int = file_offset + cursor_position
                         new_position: int = real_position + struct.calcsize(struct_eval)
                         if new_position < file_size:
-                            cursor_position = new_position % bytes_per_screen
-                            file_offset = (new_position // bytes_per_screen) * bytes_per_screen
+                            cursor_position = new_position % screen_sizing.bytes_per_screen
+                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 410:
                     # window resize
                     pass
@@ -576,7 +608,7 @@ def main(stdscr) -> None:
                 cursor_position = max(cursor_position, 0)
                 cursor_position = min(cursor_position, file_size)
                 file_offset = max(file_offset, 0)
-                file_offset = min(file_offset, file_size - (file_size % (bytes_per_line * dump_win_height-2)))
+                file_offset = min(file_offset, file_size - (file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)))
 
 
 if __name__ == "__main__":
