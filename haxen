@@ -88,7 +88,7 @@ def _spinning_cursor():
 class ScreenSizing:
     """Screen display sizing."""
 
-    def __init__(self, stdscr: curses.window, file_size: int):
+    def __init__(self, stdscr: 'curses.window', file_size: int):
         self._height, self._width = stdscr.getmaxyx()
 
         self.data_win_width: int = 42
@@ -104,22 +104,27 @@ class ScreenSizing:
 
     @property
     def data_win_height(self) -> int:
+        """Width of data window."""
         return self._height // 3
 
     @property
     def dump_win_width(self) -> int:
+        """Width of dump window."""
         return self._width - self.data_win_width
 
     @property
     def dump_win_height(self) -> int:
+        """Height of dump window."""
         return self._height
 
     @property
     def mark_win_height(self) -> int:
+        """Height of file mark window."""
         return self._height // 3
 
     @property
     def eval_win_height(self) -> int:
+        """Height of struct pattern eval window."""
         return self._height // 3
 
     @property
@@ -160,7 +165,11 @@ class ScreenSizing:
         """Maximum number of bytes displayed on the screen."""
         return self.bytes_per_line * (self.dump_win_height-2)
 
-def main(stdscr) -> None:
+class ApplicationState:
+    def __init__(self):
+       pass
+
+def main(stdscr: 'curses.window') -> None:
     """The main entry point."""
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-v', '--verbose', help='Verbose output', action='store_true', dest='verbose')
@@ -202,8 +211,8 @@ def main(stdscr) -> None:
     mark_win.refresh()
     eval_win.refresh()
 
-    cursor_position = 0
-    file_offset = 0
+    cursor_position: int = 0
+    file_offset: int = 0
 
     modes = [
         'hex',
@@ -211,7 +220,7 @@ def main(stdscr) -> None:
     ]
 
     mode = 0
-    byteorder = 'little'
+    byteorder: str = 'little'
 
     jump_offset: int = 0
 
@@ -287,7 +296,7 @@ def main(stdscr) -> None:
 
 
                 mark_win.box()
-                mark_win.addstr(0, (screen_sizing.mark_win_width>>1) - 4, 'File marks')
+                mark_win.addstr(0, (screen_sizing.mark_win_width//2) - 4, 'File marks')
                 for i,mark in enumerate(marks):
                     mark_win.addstr(1+i, 1, f'0x{mark:012X}    {(data_offset-mark):22d}')
 
@@ -430,9 +439,10 @@ def main(stdscr) -> None:
                 elif keypress == 32:
                     # repeat jump
                     try:
-                        real_position: int = file_offset + cursor_position + jump_offset
-                        cursor_position = real_position % screen_sizing.bytes_per_screen
-                        file_offset = (real_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                        new_position: int = file_offset + cursor_position + jump_offset
+                        if new_position < file_size:
+                            cursor_position = new_position % screen_sizing.bytes_per_screen
+                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                     except:
                         pass
                 elif keypress == 47:
