@@ -89,26 +89,38 @@ class ScreenSizing:
     """Screen display sizing."""
 
     def __init__(self, stdscr: curses.window, file_size: int):
-        height, width = stdscr.getmaxyx()
+        self._height, self._width = stdscr.getmaxyx()
 
         self.data_win_width: int = 42
-        self.data_win_height: int = height // 3
-
-        self.dump_win_width: int = width - self.data_win_width
-        self.dump_win_height: int = height
 
         self.mark_win_width: int = 42
-        self.mark_win_height: int = height // 3
 
         self.eval_win_width: int = 42
-        self.eval_win_height: int = height // 3
 
         if file_size > 2**32:
             self.offset_address_size: int = 12
         else:
             self.offset_address_size: int = 8
 
-        self.cursor_position: int = 0
+    @property
+    def data_win_height(self) -> int:
+        return self._height // 3
+
+    @property
+    def dump_win_width(self) -> int:
+        return self._width - self.data_win_width
+
+    @property
+    def dump_win_height(self) -> int:
+        return self._height
+
+    @property
+    def mark_win_height(self) -> int:
+        return self._height // 3
+
+    @property
+    def eval_win_height(self) -> int:
+        return self._height // 3
 
     @property
     def bytes_per_line(self) -> int:
@@ -572,7 +584,7 @@ def main(stdscr) -> None:
 
                         cursor_position = new_position % screen_sizing.bytes_per_screen
                         file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
-                elif keypress == 72:
+                elif keypress == 115:
                     # struct eval
                     struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     struct_win.box()
@@ -590,6 +602,14 @@ def main(stdscr) -> None:
 
                     if struct_eval:
                         eval_win.addstr(1, 1, f'{struct_eval}  len={(struct.calcsize(struct_eval))}')
+                elif keypress == 72:
+                     # jump back struct eval number of bytes
+                    if struct_eval:
+                        real_position: int = file_offset + cursor_position
+                        new_position: int = real_position - struct.calcsize(struct_eval)
+                        if new_position < file_size:
+                            cursor_position = new_position % screen_sizing.bytes_per_screen
+                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 104:
                     # jump struct eval number of bytes
                     if struct_eval:
@@ -598,9 +618,9 @@ def main(stdscr) -> None:
                         if new_position < file_size:
                             cursor_position = new_position % screen_sizing.bytes_per_screen
                             file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
-                elif keypress == 410:
+                elif keypress == curses.KEY_RESIZE:
                     # window resize
-                    pass
+                    screen_sizing = ScreenSizing(stdscr, file_size)
                 else:
                     if args.debug:
                         raise ValueError(keypress)
