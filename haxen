@@ -234,12 +234,6 @@ def main(stdscr: 'curses.window') -> None:
     cursor_position: int = 0
     file_offset: int = 0
 
-    ascii_search: str = ''
-    hex_search: str = b''
-    struct_eval: str = ''
-
-    marks: List[int] = []
-
     search_block_size: int = _parse_data_size(args.search)
 
     with open(args.binfile, 'rb') as fh:
@@ -307,14 +301,14 @@ def main(stdscr: 'curses.window') -> None:
 
                 mark_win.box()
                 mark_win.addstr(0, (screen_sizing.mark_win_width//2) - 4, 'File marks')
-                for i,mark in enumerate(marks):
+                for i,mark in enumerate(app_state.marks):
                     mark_win.addstr(1+i, 1, f'0x{mark:012X}    {(data_offset-mark):22d}')
 
-                if struct_eval:
+                if app_state.struct_eval:
                     real_position: int = file_offset + cursor_position
-                    eval_size = struct.calcsize(struct_eval)
+                    eval_size = struct.calcsize(app_state.struct_eval)
                     try:
-                        eval_data = struct.unpack(struct_eval, fm[real_position:real_position+eval_size])
+                        eval_data = struct.unpack(app_state.struct_eval, fm[real_position:real_position+eval_size])
                         for i,data in enumerate(eval_data):
                             if isinstance(data, bytes):
                                 eval_win.addstr(2+i, 1, ' ' * (screen_sizing.eval_win_width-4))
@@ -466,14 +460,14 @@ def main(stdscr: 'curses.window') -> None:
                         curses.echo()
                         new_ascii_search = search_win.getstr()
                         if new_ascii_search:
-                            ascii_search = new_ascii_search
+                            app_state.ascii_search = new_ascii_search
                         curses.noecho()
 
                         search_start_position: int = file_offset + cursor_position + 1
                         search_stop_position: int = search_start_position + search_block_size
 
                         search_win.erase()
-                        if ascii_search:
+                        if app_state.ascii_search:
                             spinner = _spinning_cursor()
 
                             search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
@@ -484,14 +478,14 @@ def main(stdscr: 'curses.window') -> None:
                             search_progress_win.refresh()
 
                             try:
-                                new_position = fm.find(ascii_search, search_start_position, search_stop_position)
+                                new_position = fm.find(app_state.ascii_search, search_start_position, search_stop_position)
                                 while new_position == -1:
                                     search_start_position = search_stop_position
                                     if search_start_position > file_size:
                                         break
 
                                     search_stop_position = search_start_position + search_block_size
-                                    new_position = fm.find(ascii_search, search_start_position, search_stop_position)
+                                    new_position = fm.find(app_state.ascii_search, search_start_position, search_stop_position)
                                     search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                                     search_progress_win.refresh()
 
@@ -503,7 +497,7 @@ def main(stdscr: 'curses.window') -> None:
                                     search_progress_win.addstr(1, 2, "Not found.")
                                     search_progress_win.getch()
                             except KeyboardInterrupt:
-                                ascii_search = ''
+                                app_state.ascii_search = ''
                                 search_progress_win.addstr(1, 2, " " * 57)
                                 search_progress_win.addstr(1, 2, "Search cancelled.")
                                 search_progress_win.getch()
@@ -520,9 +514,9 @@ def main(stdscr: 'curses.window') -> None:
                         new_hex_search = search_win.getstr()
                         if new_hex_search:
                             try:
-                                hex_search = bytes.fromhex(new_hex_search.decode('ascii'))
+                                app_state.hex_search = bytes.fromhex(new_hex_search.decode('ascii'))
                             except:
-                                hex_search = b''
+                                app_state.hex_search = b''
                         curses.noecho()
 
 
@@ -530,7 +524,7 @@ def main(stdscr: 'curses.window') -> None:
                         search_stop_position: int = search_start_position + search_block_size
 
                         search_win.erase()
-                        if hex_search:
+                        if app_state.hex_search:
                             spinner = _spinning_cursor()
 
                             search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
@@ -541,14 +535,14 @@ def main(stdscr: 'curses.window') -> None:
                             search_progress_win.refresh()
 
                             try:
-                                new_position = fm.find(hex_search, search_start_position, search_stop_position)
+                                new_position = fm.find(app_state.hex_search, search_start_position, search_stop_position)
                                 while new_position == -1:
                                     search_start_position = search_stop_position
                                     if search_start_position > file_size:
                                         break
 
                                     search_stop_position = search_start_position + search_block_size
-                                    new_position = fm.find(hex_search, search_start_position, search_stop_position)
+                                    new_position = fm.find(app_state.hex_search, search_start_position, search_stop_position)
                                     search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
                                     search_progress_win.refresh()
 
@@ -560,7 +554,7 @@ def main(stdscr: 'curses.window') -> None:
                                     search_progress_win.addstr(1, 2, "Not found.")
                                     search_progress_win.getch()
                             except KeyboardInterrupt:
-                                hex_search = b''
+                                app_state.hex_search = b''
                                 search_progress_win.addstr(1, 2, " " * 57)
                                 search_progress_win.addstr(1, 2, "Search cancelled.")
                                 search_progress_win.getch()
@@ -572,34 +566,34 @@ def main(stdscr: 'curses.window') -> None:
                     # add file mark
                     data_offset: int = file_offset + cursor_position
 
-                    if data_offset not in marks:
-                        marks.append(data_offset)
+                    if data_offset not in app_state.marks:
+                        app_state.marks.append(data_offset)
 
-                        while len(marks) > 10:
-                            marks.pop(0)
+                        while len(app_state.marks) > 10:
+                            app_state.marks.pop(0)
                 elif keypress == 77:
                     # remove last file mark
-                    if marks:
-                        marks.pop()
+                    if app_state.marks:
+                        app_state.marks.pop()
                     mark_win.clear()
                 elif keypress == 67:
                     # jump to previous mark
-                    if marks:
+                    if app_state.marks:
                         real_position: int = file_offset + cursor_position
-                        next_positions: int = [mark for mark in marks if mark < real_position]
+                        next_positions: int = [mark for mark in app_state.marks if mark < real_position]
 
-                        new_position: int = next_positions[-1] if next_positions else marks[-1]
+                        new_position: int = next_positions[-1] if next_positions else app_state.marks[-1]
 
                         cursor_position = new_position % screen_sizing.bytes_per_screen
                         file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
 
                 elif keypress == 99:
                     # jump to next mark
-                    if marks:
+                    if app_state.marks:
                         real_position: int = file_offset + cursor_position
-                        next_positions: int = [mark for mark in marks if mark > real_position]
+                        next_positions: int = [mark for mark in app_state.marks if mark > real_position]
 
-                        new_position: int = next_positions[0] if next_positions else marks[0]
+                        new_position: int = next_positions[0] if next_positions else app_state.marks[0]
 
                         cursor_position = new_position % screen_sizing.bytes_per_screen
                         file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
@@ -607,33 +601,33 @@ def main(stdscr: 'curses.window') -> None:
                     # struct eval
                     struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     struct_win.box()
-                    struct_win.addstr(1, 2, struct_eval)
+                    struct_win.addstr(1, 2, app_state.struct_eval)
                     char = struct_win.getch()
                     while char != 10:
                         if char == 127:
-                            if struct_eval:
-                                struct_eval = struct_eval[:-1]
+                            if app_state.struct_eval:
+                                app_state.struct_eval = app_state.struct_eval[:-1]
                         else:
-                            struct_eval += chr(char)
-                        struct_win.addstr(1, 2 + len(struct_eval), ' ')
-                        struct_win.addstr(1, 2, struct_eval)
+                            app_state.struct_eval += chr(char)
+                        struct_win.addstr(1, 2 + len(app_state.struct_eval), ' ')
+                        struct_win.addstr(1, 2, app_state.struct_eval)
                         char = struct_win.getch()
 
-                    if struct_eval:
-                        eval_win.addstr(1, 1, f'{struct_eval}  len={(struct.calcsize(struct_eval))}')
+                    if app_state.struct_eval:
+                        eval_win.addstr(1, 1, f'{app_state.struct_eval}  len={(struct.calcsize(app_state.struct_eval))}')
                 elif keypress == 72:
                      # jump back struct eval number of bytes
-                    if struct_eval:
+                    if app_state.struct_eval:
                         real_position: int = file_offset + cursor_position
-                        new_position: int = real_position - struct.calcsize(struct_eval)
+                        new_position: int = real_position - struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
                             cursor_position = new_position % screen_sizing.bytes_per_screen
                             file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 104:
                     # jump struct eval number of bytes
-                    if struct_eval:
+                    if app_state.struct_eval:
                         real_position: int = file_offset + cursor_position
-                        new_position: int = real_position + struct.calcsize(struct_eval)
+                        new_position: int = real_position + struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
                             cursor_position = new_position % screen_sizing.bytes_per_screen
                             file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
