@@ -267,9 +267,10 @@ def main(stdscr) -> None:
                         eval_data = struct.unpack(struct_eval, fm[real_position:real_position+eval_size])
                         for i,data in enumerate(eval_data):
                             if isinstance(data, bytes):
+                                eval_win.addstr(2+i, 1, ' ' * (eval_win_width-4))
                                 eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_print(data)}')
                             else:
-                                eval_win.addstr(2+i, 1, f'{i:<3d} {str(data)}')
+                                eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{eval_win_width-8}d}')
                     except:
                         eval_win.addstr(2, 1, f'*Error*')
 
@@ -536,7 +537,7 @@ def main(stdscr) -> None:
                 elif keypress == 67:
                     # jump to previous mark
                     if marks:
-                        real_position: int = file_offset + cursor_position + jump_offset
+                        real_position: int = file_offset + cursor_position
                         next_positions: int = [mark for mark in marks if mark < real_position]
 
                         new_position: int = next_positions[-1] if next_positions else marks[-1]
@@ -547,14 +548,14 @@ def main(stdscr) -> None:
                 elif keypress == 99:
                     # jump to next mark
                     if marks:
-                        real_position: int = file_offset + cursor_position + jump_offset
+                        real_position: int = file_offset + cursor_position
                         next_positions: int = [mark for mark in marks if mark > real_position]
 
                         new_position: int = next_positions[0] if next_positions else marks[0]
 
                         cursor_position = new_position % bytes_per_screen
                         file_offset = (new_position // bytes_per_screen) * bytes_per_screen
-                elif keypress == 104:
+                elif keypress == 72:
                     # struct eval
                     struct_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
                     struct_win.box()
@@ -572,10 +573,10 @@ def main(stdscr) -> None:
 
                     if struct_eval:
                         eval_win.addstr(1, 1, f'{struct_eval}  len={(struct.calcsize(struct_eval))}')
-                elif keypress == 72:
+                elif keypress == 104:
                     # jump struct eval number of bytes
                     if struct_eval:
-                        real_position: int = file_offset + cursor_position + jump_offset
+                        real_position: int = file_offset + cursor_position
                         new_position: int = real_position + struct.calcsize(struct_eval)
                         if new_position < file_size:
                             cursor_position = new_position % bytes_per_screen
