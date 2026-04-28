@@ -18,6 +18,20 @@ from typing import Dict,List,Tuple
 
 logger = logging.getLogger(__name__)
 
+def _parse_data_size(arg: str) -> int:
+    size = arg
+
+    if size.endswith('K') or size.endswith('k'):
+        size = int(size[:-1]) * 1024
+    elif size.endswith('M') or size.endswith('m'):
+        size = int(size[:-1]) * 1024*1024
+    elif size.isdigit():
+        size = int(size)
+    else:
+        raise ValueError("illegal size unit.")
+
+    return size
+
 def _buffer_as_hex(buffer: bytes, no_spaces: bool = False) -> str:
     """Util to convert buffer to human friendly format."""
 
@@ -80,6 +94,7 @@ def main(stdscr) -> None:
     argparser.add_argument('-v', '--verbose', help='Verbose output', action='store_true', dest='verbose')
     argparser.add_argument('-q', '--quiet', help='Quiet output', action='store_true', dest='quiet')
     argparser.add_argument('-d', '--debug', help='Debug mode', action='store_true', dest='debug')
+    argparser.add_argument('-s', '--search', help='Search block size', type=str, dest='search', default='20M')
     argparser.add_argument('binfile', help='Input binary file', type=str)
     args = argparser.parse_args()
 
@@ -169,6 +184,8 @@ def main(stdscr) -> None:
     struct_eval: str = ''
 
     marks: List[int] = []
+
+    search_block_size: int = _parse_data_size(args.search)
 
     with open(args.binfile, 'rb') as fh:
         with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as fm:
@@ -461,7 +478,7 @@ def main(stdscr) -> None:
 
 
                         search_start_position: int = file_offset + cursor_position + jump_offset + 1
-                        search_stop_position: int = search_start_position + (20*1024*1024)
+                        search_stop_position: int = search_start_position + search_block_size
 
                         search_win.erase()
                         if hex_search:
@@ -481,7 +498,7 @@ def main(stdscr) -> None:
                                     if search_start_position > file_size:
                                         break
 
-                                    search_stop_position = search_start_position + (20*1024*1024)
+                                    search_stop_position = search_start_position + search_block_size
                                     new_position = fm.find(hex_search, search_start_position, search_stop_position)
                                     search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{offset_address_size}X}/0x{file_size:0{offset_address_size}X}")
                                     search_progress_win.refresh()
