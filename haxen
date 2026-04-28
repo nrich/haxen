@@ -10,10 +10,8 @@ import datetime
 import logging
 import mmap
 import os.path
-import string
 import struct
-import textwrap
-from typing import Dict,List,Tuple
+from typing import List,Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +44,7 @@ def _buffer_as_spaced_hex(buffer: bytes) -> str:
         chunks.append(" ".join([f'{b & 0xff:02X}' for b in list(buffer[i:i+4])]))
 
 
-    return "  ".join(chunks)    
+    return "  ".join(chunks)
 
 def _buffer_as_print(buffer: bytes) -> str:
     allowed = bytearray(b'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ ')
@@ -84,8 +82,9 @@ def _index_to_ascii_position(idx: int, bytes_per_line: int, left_offset: int) ->
 
 def _spinning_cursor():
     while True:
-        for cursor in '|/-\\':
-            yield cursor
+        yield from '|/-\\'
+        #for cursor in '|/-\\':
+        #    yield cursor
 
 def main(stdscr) -> None:
     """The main entry point."""
@@ -111,16 +110,16 @@ def main(stdscr) -> None:
     #stdscr.addstr(0, width>>1, os.path.basename(args.binfile))
 
     data_win_width: int = 42
-    data_win_height: int = (height // 3)
+    data_win_height: int = height // 3
 
-    dump_win_width: int = (width - data_win_width)
+    dump_win_width: int = width - data_win_width
     dump_win_height: int = height
 
     mark_win_width: int = 42
-    mark_win_height: int = (height // 3)
+    mark_win_height: int = height // 3
 
     eval_win_width: int = 42
-    eval_win_height: int = (height // 3)
+    eval_win_height: int = height // 3
 
     # newwin(height, width, begin_y, begin_x)
     dump_win = curses.newwin(dump_win_height, dump_win_width, 0, 0)
@@ -130,11 +129,11 @@ def main(stdscr) -> None:
 
     mark_win = curses.newwin(mark_win_height, mark_win_width, data_win_height, dump_win_width+0)
     mark_win.box()
-    mark_win.addstr(0, (mark_win_width>>1) - 4, f'File marks')
+    mark_win.addstr(0, (mark_win_width>>1) - 4, 'File marks')
 
     eval_win = curses.newwin(eval_win_height, eval_win_width, data_win_height+mark_win_height, dump_win_width+0)
     eval_win.box()
-    eval_win.addstr(0, (eval_win_width>>1) - 4, f'Eval')
+    eval_win.addstr(0, (eval_win_width>>1) - 4, 'Eval')
 
     # Refresh to display changes
     stdscr.refresh()
@@ -161,8 +160,6 @@ def main(stdscr) -> None:
 
     hex_offset = offset_address_size + 3
     ascii_offset = (bytes_per_line * 3 + (bytes_per_line // 4)) + hex_offset
-
-    #raise ValueError((bytes_per_line, hex_offset, ascii_offset, _index_to_position(31, bytes_per_line, offset_address_size))) 
 
     cursor_position = 0
 
@@ -225,7 +222,6 @@ def main(stdscr) -> None:
                     real_position: int = file_offset + cursor_position
                     dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_REVERSE)
 
-                screen_start_offset: int = file_offset
                 bytes_per_screen: int = bytes_per_line * (dump_win_height-2)
 
                 int8 = int.from_bytes(fm[data_offset:data_offset+1], byteorder=byteorder, signed=True)
@@ -255,7 +251,7 @@ def main(stdscr) -> None:
 
 
                 mark_win.box()
-                mark_win.addstr(0, (mark_win_width>>1) - 4, f'File marks')
+                mark_win.addstr(0, (mark_win_width>>1) - 4, 'File marks')
                 for i,mark in enumerate(marks):
                     mark_win.addstr(1+i, 1, f'0x{mark:012X}    {(data_offset-mark):22d}')
 
@@ -271,7 +267,7 @@ def main(stdscr) -> None:
                             else:
                                 eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{eval_win_width-8}d}')
                     except:
-                        eval_win.addstr(2, 1, f'*Error*')
+                        eval_win.addstr(2, 1, '*Error*')
 
                 data_win.refresh()
                 dump_win.refresh()
@@ -405,8 +401,6 @@ def main(stdscr) -> None:
                         pass
                 elif keypress == 47:
                     # search
-                    pass
-
                     if mode == 1:
                         search_win = curses.newwin(3, 60, dump_win_height//2 - 1, dump_win_width//2 - 30)
                         search_win.box()
@@ -451,12 +445,12 @@ def main(stdscr) -> None:
                                     file_offset = (new_position // bytes_per_screen) * bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
-                                    search_progress_win.addstr(1, 2, f"Not found.")
+                                    search_progress_win.addstr(1, 2, "Not found.")
                                     search_progress_win.getch()
                             except KeyboardInterrupt:
                                 ascii_search = ''
                                 search_progress_win.addstr(1, 2, " " * 57)
-                                search_progress_win.addstr(1, 2, f"Search cancelled.")
+                                search_progress_win.addstr(1, 2, "Search cancelled.")
                                 search_progress_win.getch()
 
 
@@ -508,12 +502,12 @@ def main(stdscr) -> None:
                                     file_offset = (new_position // bytes_per_screen) * bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
-                                    search_progress_win.addstr(1, 2, f"Not found.")
+                                    search_progress_win.addstr(1, 2, "Not found.")
                                     search_progress_win.getch()
                             except KeyboardInterrupt:
                                 hex_search = b''
                                 search_progress_win.addstr(1, 2, " " * 57)
-                                search_progress_win.addstr(1, 2, f"Search cancelled.")
+                                search_progress_win.addstr(1, 2, "Search cancelled.")
                                 search_progress_win.getch()
 
 
