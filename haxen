@@ -83,8 +83,6 @@ def _index_to_ascii_position(idx: int, bytes_per_line: int, left_offset: int) ->
 def _spinning_cursor():
     while True:
         yield from '|/-\\'
-        #for cursor in '|/-\\':
-        #    yield cursor
 
 def main(stdscr) -> None:
     """The main entry point."""
@@ -106,9 +104,6 @@ def main(stdscr) -> None:
     stdscr.clear()
     height, width = stdscr.getmaxyx()
 
-    #stdscr.border()
-    #stdscr.addstr(0, width>>1, os.path.basename(args.binfile))
-
     data_win_width: int = 42
     data_win_height: int = height // 3
 
@@ -121,9 +116,8 @@ def main(stdscr) -> None:
     eval_win_width: int = 42
     eval_win_height: int = height // 3
 
-    # newwin(height, width, begin_y, begin_x)
     dump_win = curses.newwin(dump_win_height, dump_win_width, 0, 0)
-    dump_win.box() # Uses default characters
+    dump_win.box()
 
     data_win = curses.newwin(data_win_height, data_win_width, 0, dump_win_width+0)
 
@@ -141,8 +135,6 @@ def main(stdscr) -> None:
     data_win.refresh()
     mark_win.refresh()
     eval_win.refresh()
-
-    #dump_win.addstr(0, dump_win_width + (data_win_width>>1), "Eval")
 
 
     file_size: int = os.path.getsize(args.binfile)
