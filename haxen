@@ -231,15 +231,12 @@ def main(stdscr: 'curses.window') -> None:
 
     app_state = ApplicationState()
 
-    cursor_position: int = 0
-    file_offset: int = 0
-
     search_block_size: int = _parse_data_size(args.search)
 
     with open(args.binfile, 'rb') as fh:
         with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as fm:
             while True:
-                data_offset: int = file_offset + cursor_position
+                data_offset: int = app_state.file_offset + app_state.cursor_position
 
                 dump_win.box() # Uses default characters
                 dump_win.addstr(0, screen_sizing.dump_win_width//2, os.path.basename(args.binfile))
@@ -249,15 +246,15 @@ def main(stdscr: 'curses.window') -> None:
                 data_win.addstr(0, (screen_sizing.data_win_width//2) - 4, f'Data ({app_state.byteorder})')
 
                 if app_state.mode == MODE_ASCII:
-                    cy, cx = _index_to_ascii_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
+                    cy, cx = _index_to_ascii_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                 else:
-                    cy, cx = _index_to_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
+                    cy, cx = _index_to_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
 
                 stdscr.move(cy, cx)
                 cy, cx = stdscr.getyx()
 
                 for i in range(0, screen_sizing.dump_win_height-2):
-                    offset: int = i * screen_sizing.bytes_per_line + file_offset
+                    offset: int = i * screen_sizing.bytes_per_line + app_state.file_offset
 
                     hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
@@ -265,12 +262,12 @@ def main(stdscr: 'curses.window') -> None:
                     dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_print(hex_data)}')
 
                 if app_state.mode == MODE_HEX:
-                    sy, sx = _index_to_ascii_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
-                    real_position: int = file_offset + cursor_position
+                    sy, sx = _index_to_ascii_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
+                    real_position: int = app_state.file_offset + app_state.cursor_position
                     dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_REVERSE)
                 else:
-                    sy, sx = _index_to_position(cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
-                    real_position: int = file_offset + cursor_position
+                    sy, sx = _index_to_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
+                    real_position: int = app_state.file_offset + app_state.cursor_position
                     dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_REVERSE)
 
                 int8 = int.from_bytes(fm[data_offset:data_offset+1], byteorder=app_state.byteorder, signed=True)
@@ -305,7 +302,7 @@ def main(stdscr: 'curses.window') -> None:
                     mark_win.addstr(1+i, 1, f'0x{mark:012X}    {(data_offset-mark):22d}')
 
                 if app_state.struct_eval:
-                    real_position: int = file_offset + cursor_position
+                    real_position: int = app_state.file_offset + app_state.cursor_position
                     eval_size = struct.calcsize(app_state.struct_eval)
                     try:
                         eval_data = struct.unpack(app_state.struct_eval, fm[real_position:real_position+eval_size])
@@ -328,62 +325,62 @@ def main(stdscr: 'curses.window') -> None:
                 if keypress == curses.KEY_DOWN:
                     # down
                     if cy > (screen_sizing.dump_win_height-3):
-                        file_offset += screen_sizing.bytes_per_line
+                        app_state.file_offset += screen_sizing.bytes_per_line
                     else:
-                        cursor_position += screen_sizing.bytes_per_line
+                        app_state.cursor_position += screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_UP:
                     # up
 
                     if cy < 2:
-                        file_offset -= screen_sizing.bytes_per_line
+                        app_state.file_offset -= screen_sizing.bytes_per_line
                     else:
-                        cursor_position -= screen_sizing.bytes_per_line
+                        app_state.cursor_position -= screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_LEFT:
                     # left
-                    cursor_position -= 1
+                    app_state.cursor_position -= 1
                     if cy < 2:
                         if app_state.mode == MODE_HEX:
                             if cx <= screen_sizing.hex_offset:
-                                file_offset -= screen_sizing.bytes_per_line
-                                cursor_position += screen_sizing.bytes_per_line
+                                app_state.file_offset -= screen_sizing.bytes_per_line
+                                app_state.cursor_position += screen_sizing.bytes_per_line
                         else:
                             if cx <= screen_sizing.ascii_offset:
-                                file_offset -= screen_sizing.bytes_per_line
-                                cursor_position += screen_sizing.bytes_per_line
+                                app_state.file_offset -= screen_sizing.bytes_per_line
+                                app_state.cursor_position += screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_RIGHT:
                     # right
-                    cursor_position += 1
+                    app_state.cursor_position += 1
                     if cy > (screen_sizing.dump_win_height-3):
                         if app_state.mode == MODE_HEX:
                             if cx >= screen_sizing.ascii_offset - 4:
-                                file_offset += screen_sizing.bytes_per_line
-                                cursor_position -= screen_sizing.bytes_per_line
+                                app_state.file_offset += screen_sizing.bytes_per_line
+                                app_state.cursor_position -= screen_sizing.bytes_per_line
                         else:
                             if cx > screen_sizing.ascii_offset + screen_sizing.bytes_per_line - 2:
-                                file_offset += screen_sizing.bytes_per_line
-                                cursor_position -= screen_sizing.bytes_per_line
+                                app_state.file_offset += screen_sizing.bytes_per_line
+                                app_state.cursor_position -= screen_sizing.bytes_per_line
 
                 elif keypress == 9:
                     # switch window
                     app_state.mode = MODE_HEX if app_state.mode == MODE_ASCII else MODE_ASCII
                 elif keypress == curses.KEY_NPAGE:
                     # next screen
-                    file_offset += screen_sizing.bytes_per_screen
+                    app_state.file_offset += screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress == curses.KEY_PPAGE:
                     # previous screen
-                    file_offset -= screen_sizing.bytes_per_screen
+                    app_state.file_offset -= screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress in [44, 60]:
                     # jump to start
-                    cursor_position = 0
-                    file_offset = 0
+                    app_state.cursor_position = 0
+                    app_state.file_offset = 0
                     dump_win.clear()
                 elif keypress in [46, 62]:
                     # jump to end
-                    file_offset = file_size // (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2) * (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
-                    cursor_position = file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
-                    cursor_position -= 1
+                    app_state.file_offset = file_size // (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2) * (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
+                    app_state.cursor_position = file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)
+                    app_state.cursor_position -= 1
                     dump_win.clear()
                 elif keypress == 10:
                     # Jump to position
@@ -403,8 +400,8 @@ def main(stdscr: 'curses.window') -> None:
                         if jump_location > file_size:
                             raise ValueError('Invalid jump location')
 
-                        cursor_position = jump_location % screen_sizing.bytes_per_screen
-                        file_offset = (jump_location // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                        app_state.cursor_position = jump_location % screen_sizing.bytes_per_screen
+                        app_state.file_offset = (jump_location // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                     except:
                         pass
                 elif keypress == 106:
@@ -442,10 +439,10 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 32:
                     # repeat jump
                     try:
-                        new_position: int = file_offset + cursor_position + app_state.jump_offset
+                        new_position: int = app_state.file_offset + app_state.cursor_position + app_state.jump_offset
                         if new_position < file_size:
-                            cursor_position = new_position % screen_sizing.bytes_per_screen
-                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                            app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                            app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                     except:
                         pass
                 elif keypress == 47:
@@ -463,7 +460,7 @@ def main(stdscr: 'curses.window') -> None:
                             app_state.ascii_search = new_ascii_search
                         curses.noecho()
 
-                        search_start_position: int = file_offset + cursor_position + 1
+                        search_start_position: int = app_state.file_offset + app_state.cursor_position + 1
                         search_stop_position: int = search_start_position + search_block_size
 
                         search_win.erase()
@@ -490,8 +487,8 @@ def main(stdscr: 'curses.window') -> None:
                                     search_progress_win.refresh()
 
                                 if new_position != -1:
-                                    cursor_position = new_position % screen_sizing.bytes_per_screen
-                                    file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                                    app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                                    app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
                                     search_progress_win.addstr(1, 2, "Not found.")
@@ -520,7 +517,7 @@ def main(stdscr: 'curses.window') -> None:
                         curses.noecho()
 
 
-                        search_start_position: int = file_offset + cursor_position + 1
+                        search_start_position: int = app_state.file_offset + app_state.cursor_position + 1
                         search_stop_position: int = search_start_position + search_block_size
 
                         search_win.erase()
@@ -547,8 +544,8 @@ def main(stdscr: 'curses.window') -> None:
                                     search_progress_win.refresh()
 
                                 if new_position != -1:
-                                    cursor_position = new_position % screen_sizing.bytes_per_screen
-                                    file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                                    app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                                    app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                                 else:
                                     search_progress_win.addstr(1, 2, " " * 57)
                                     search_progress_win.addstr(1, 2, "Not found.")
@@ -564,7 +561,7 @@ def main(stdscr: 'curses.window') -> None:
                     app_state.byteorder = 'little' if app_state.byteorder == 'big' else 'big'
                 elif keypress == 109:
                     # add file mark
-                    data_offset: int = file_offset + cursor_position
+                    data_offset: int = app_state.file_offset + app_state.cursor_position
 
                     if data_offset not in app_state.marks:
                         app_state.marks.append(data_offset)
@@ -579,24 +576,24 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 67:
                     # jump to previous mark
                     if app_state.marks:
-                        real_position: int = file_offset + cursor_position
+                        real_position: int = app_state.file_offset + app_state.cursor_position
                         next_positions: int = [mark for mark in app_state.marks if mark < real_position]
 
                         new_position: int = next_positions[-1] if next_positions else app_state.marks[-1]
 
-                        cursor_position = new_position % screen_sizing.bytes_per_screen
-                        file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                        app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                        app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
 
                 elif keypress == 99:
                     # jump to next mark
                     if app_state.marks:
-                        real_position: int = file_offset + cursor_position
+                        real_position: int = app_state.file_offset + app_state.cursor_position
                         next_positions: int = [mark for mark in app_state.marks if mark > real_position]
 
                         new_position: int = next_positions[0] if next_positions else app_state.marks[0]
 
-                        cursor_position = new_position % screen_sizing.bytes_per_screen
-                        file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                        app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                        app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 115:
                     # struct eval
                     struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
@@ -618,19 +615,19 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 72:
                      # jump back struct eval number of bytes
                     if app_state.struct_eval:
-                        real_position: int = file_offset + cursor_position
+                        real_position: int = app_state.file_offset + app_state.cursor_position
                         new_position: int = real_position - struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
-                            cursor_position = new_position % screen_sizing.bytes_per_screen
-                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                            app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                            app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 104:
                     # jump struct eval number of bytes
                     if app_state.struct_eval:
-                        real_position: int = file_offset + cursor_position
+                        real_position: int = app_state.file_offset + app_state.cursor_position
                         new_position: int = real_position + struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
-                            cursor_position = new_position % screen_sizing.bytes_per_screen
-                            file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+                            app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+                            app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == curses.KEY_RESIZE:
                     # window resize
                     screen_sizing = ScreenSizing(stdscr, file_size)
@@ -638,10 +635,10 @@ def main(stdscr: 'curses.window') -> None:
                     if args.debug:
                         raise ValueError(keypress)
 
-                cursor_position = max(cursor_position, 0)
-                cursor_position = min(cursor_position, file_size)
-                file_offset = max(file_offset, 0)
-                file_offset = min(file_offset, file_size - (file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)))
+                app_state.cursor_position = max(app_state.cursor_position, 0)
+                app_state.cursor_position = min(app_state.cursor_position, file_size)
+                app_state.file_offset = max(app_state.file_offset, 0)
+                app_state.file_offset = min(app_state.file_offset, file_size - (file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)))
 
 
 if __name__ == "__main__":
