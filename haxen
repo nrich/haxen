@@ -88,7 +88,6 @@ def _spinning_cursor():
     while True:
         yield from '|/-\\'
 
-
 class ScreenSizing:
     """Screen display sizing."""
 
@@ -169,6 +168,28 @@ class ScreenSizing:
         """Maximum number of bytes displayed on the screen."""
         return self.bytes_per_line * (self.dump_win_height-2)
 
+    @property
+    def help_win_height(self) -> int:
+        """Width of data window."""
+        return self._height // 2
+
+    @property
+    def help_win_width(self) -> int:
+        """Width of dump window."""
+        return self._width // 2
+
+
+    @property
+    def help_win_y(self) -> int:
+        """Width of data window."""
+        return self._height // 4
+
+    @property
+    def help_win_x(self) -> int:
+        """Width of dump window."""
+        return self._width // 4
+
+
 class ApplicationState:
     """Stores application state."""
 
@@ -191,6 +212,42 @@ class ApplicationState:
     def data_offset(self) -> int:
         """The actual offset in file."""
         return self.file_offset + self.cursor_position
+
+
+def _show_help_window(screen_sizing: ScreenSizing):
+    help_win = curses.newwin(screen_sizing.help_win_height, screen_sizing.help_win_width, screen_sizing.help_win_y, screen_sizing.help_win_x)
+    help_win.box()
+    help_win.addstr(0, (screen_sizing.help_win_width // 2) - 2, "Help")
+
+    help_messages: List[Tuple[str, str]] = [
+        ("F1", "Open help window"),
+        ("TAB", "Switch between HEX and ASCII mode"),
+        ("ENTER", "Jump to absolute file postion"),
+        ("PGUP", "Jump back one screen of data"),
+        ("PGDN", "Jump forward one screen of data"),
+        ("/", "Search for bytes in HEX mode, or string in ASCII mode"),
+        ("j", "Set $JUMP_OFFSET count (as decimal)"),
+        ("J", "Set $JUMP_OFFSET count (as hex)"),
+        ("SPACE", "Jump forward $JUMP_OFFSET bytes"),
+        ("m", "Create new file make at current cursor position"),
+        ("M", "Remove last created file mark"),
+        ("c", "Jump to next file mark"),
+        ("C", "Jump to previous file mark"),
+        ("l", "Toggle between little and big endian display mode"),
+        ("s", "Set struct eval pattern $STRUCT"),
+        ("h", "Jump forward sizeof($STRUCT) bytes"),
+        ("H", "Jump backward sizeof($STRUCT) bytes"),
+        ("<", "Jump to first byte of file"),
+        (">", "Jump to last byte of file"),
+    ]
+
+
+    for i, (keypress, message) in enumerate(help_messages):
+        help_win.addstr(3+i, 4, keypress)
+        help_win.addstr(3+i, 20, message)
+
+    help_win.refresh()
+
 
 def main(stdscr: 'curses.window') -> None:
     """The main entry point."""
@@ -267,11 +324,11 @@ def main(stdscr: 'curses.window') -> None:
                 if app_state.mode == MODE_HEX:
                     sy, sx = _index_to_ascii_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
-                    dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_REVERSE)
+                    dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
                 else:
                     sy, sx = _index_to_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
-                    dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_REVERSE)
+                    dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
 
                 int8 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+1], byteorder=app_state.byteorder, signed=True)
                 uint8 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+1], byteorder=app_state.byteorder, signed=False)
@@ -628,6 +685,10 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == curses.KEY_RESIZE:
                     # window resize
                     screen_sizing = ScreenSizing(stdscr, file_size)
+                elif keypress == curses.KEY_F1:
+                    _show_help_window(screen_sizing)
+                    stdscr.getch()
+                    stdscr.refresh()
                 else:
                     if args.debug:
                         raise ValueError(keypress)
