@@ -33,14 +33,6 @@ def _parse_data_size(arg: str) -> int:
 
     return size
 
-def _buffer_as_hex(buffer: bytes, no_spaces: bool = False) -> str:
-    """Util to convert buffer to human friendly format."""
-
-    if no_spaces:
-        return "".join([f'{b & 0xff:02X}' for b in list(buffer)])
-
-    return " ".join([f'{b & 0xff:02X}' for b in list(buffer)])
-
 def _buffer_as_spaced_hex(buffer: bytes) -> str:
     chunks: List[str] = []
 
@@ -50,7 +42,7 @@ def _buffer_as_spaced_hex(buffer: bytes) -> str:
 
     return "  ".join(chunks)
 
-def _buffer_as_print(buffer: bytes) -> str:
+def _buffer_as_printable(buffer: bytes) -> str:
     allowed = bytearray(b'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ ')
 
     return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
@@ -220,7 +212,7 @@ def _show_help_window(screen_sizing: ScreenSizing):
     help_win.addstr(0, (screen_sizing.help_win_width // 2) - 2, "Help")
 
     help_messages: List[Tuple[str, str]] = [
-        ("F1", "Open help window"),
+        ("h", "Open help window"),
         ("TAB", "Switch between HEX and ASCII mode"),
         ("ENTER", "Jump to absolute file postion"),
         ("PGUP", "Jump back one screen of data"),
@@ -231,14 +223,15 @@ def _show_help_window(screen_sizing: ScreenSizing):
         ("SPACE", "Jump forward $JUMP_OFFSET bytes"),
         ("m", "Create new file make at current cursor position"),
         ("M", "Remove last created file mark"),
-        ("c", "Jump to next file mark"),
-        ("C", "Jump to previous file mark"),
+        ("n", "Jump to next file mark"),
+        ("N", "Jump to previous file mark"),
         ("l", "Toggle between little and big endian display mode"),
         ("s", "Set struct eval pattern $STRUCT"),
-        ("h", "Jump forward sizeof($STRUCT) bytes"),
-        ("H", "Jump backward sizeof($STRUCT) bytes"),
+        ("[", "Jump forward sizeof($STRUCT) bytes"),
+        ("]", "Jump backward sizeof($STRUCT) bytes"),
         ("<", "Jump to first byte of file"),
         (">", "Jump to last byte of file"),
+        ("q", "Quit"),
     ]
 
 
@@ -319,12 +312,12 @@ def main(stdscr: 'curses.window') -> None:
                     hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
                     dump_win.addstr(i+1, 1, f'{offset:0{screen_sizing.offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
-                    dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_print(hex_data)}')
+                    dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_printable(hex_data)}')
 
                 if app_state.mode == MODE_HEX:
                     sy, sx = _index_to_ascii_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
-                    dump_win.addstr(sy, sx, _buffer_as_print(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
+                    dump_win.addstr(sy, sx, _buffer_as_printable(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
                 else:
                     sy, sx = _index_to_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
@@ -369,7 +362,7 @@ def main(stdscr: 'curses.window') -> None:
                         for i,data in enumerate(eval_data):
                             if isinstance(data, bytes):
                                 eval_win.addstr(2+i, 1, ' ' * (screen_sizing.eval_win_width-4))
-                                eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_print(data)}')
+                                eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_printable(data)}')
                             else:
                                 eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{screen_sizing.eval_win_width-8}d}')
                     except:
@@ -421,29 +414,29 @@ def main(stdscr: 'curses.window') -> None:
                                 app_state.cursor_position -= screen_sizing.bytes_per_line
 
                 elif keypress == 9:
-                    # switch window
+                    # TAB switch window
                     app_state.mode = MODE_HEX if app_state.mode == MODE_ASCII else MODE_ASCII
                 elif keypress == curses.KEY_NPAGE:
-                    # next screen
+                    # PGDN next screen
                     app_state.file_offset += screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress == curses.KEY_PPAGE:
-                    # previous screen
+                    # PGUP previous screen
                     app_state.file_offset -= screen_sizing.bytes_per_screen
                     dump_win.clear()
                 elif keypress in [44, 60]:
-                    # jump to start
+                    # < jump to start
                     app_state.cursor_position = 0
                     app_state.file_offset = 0
                     dump_win.clear()
                 elif keypress in [46, 62]:
-                    # jump to end
+                    # > jump to end
                     app_state.file_offset = file_size // screen_sizing.bytes_per_screen * screen_sizing.bytes_per_screen
                     app_state.cursor_position = file_size % screen_sizing.bytes_per_screen
                     app_state.cursor_position -= 1
                     dump_win.clear()
                 elif keypress == 10:
-                    # Jump to position
+                    # ENTER Jump to position
                     jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Jump to position")
@@ -465,7 +458,7 @@ def main(stdscr: 'curses.window') -> None:
                     except:
                         pass
                 elif keypress == 106:
-                    # set jump
+                    # j set jump
                     jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Set Jump Offset")
@@ -481,7 +474,7 @@ def main(stdscr: 'curses.window') -> None:
                     except:
                         app_state.jump_offset = 0
                 elif keypress == 74:
-                    # set jump
+                    # J set jump
                     jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     jump_win.box()
                     jump_win.addstr(0, 22, "Set Jump Offset")
@@ -497,7 +490,7 @@ def main(stdscr: 'curses.window') -> None:
                     except:
                         app_state.jump_offset = 0
                 elif keypress == 32:
-                    # repeat jump
+                    # SPACE repeat jump
                     try:
                         new_position: int = app_state.data_offset + app_state.jump_offset
                         if new_position < file_size:
@@ -506,7 +499,7 @@ def main(stdscr: 'curses.window') -> None:
                     except:
                         pass
                 elif keypress == 47:
-                    # search
+                    # / search
                     if app_state.mode == MODE_ASCII:
                         search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                         search_win.box()
@@ -618,21 +611,22 @@ def main(stdscr: 'curses.window') -> None:
 
 
                 elif keypress == 108:
+                    # l toggle big/little endian display
                     app_state.byteorder = 'little' if app_state.byteorder == 'big' else 'big'
                 elif keypress == 109:
-                    # add file mark
+                    # m add file mark
                     if app_state.data_offset not in app_state.marks:
                         app_state.marks.append(app_state.data_offset)
 
                         while len(app_state.marks) > 10:
                             app_state.marks.pop(0)
                 elif keypress == 77:
-                    # remove last file mark
+                    # M remove last file mark
                     if app_state.marks:
                         app_state.marks.pop()
                     mark_win.clear()
-                elif keypress == 67:
-                    # jump to previous mark
+                elif keypress == 78:
+                    # N jump to previous mark
                     if app_state.marks:
                         next_positions: int = [mark for mark in app_state.marks if mark < app_state.data_offset]
 
@@ -641,8 +635,8 @@ def main(stdscr: 'curses.window') -> None:
                         app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
                         app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
 
-                elif keypress == 99:
-                    # jump to next mark
+                elif keypress == 110:
+                    # n jump to next mark
                     if app_state.marks:
                         next_positions: int = [mark for mark in app_state.marks if mark > app_state.data_offset]
 
@@ -651,9 +645,10 @@ def main(stdscr: 'curses.window') -> None:
                         app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
                         app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 115:
-                    # struct eval
+                    # s struct eval
                     struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
                     struct_win.box()
+                    struct_win.addstr(0, 23, "Struct Pattern")
                     struct_win.addstr(1, 2, app_state.struct_eval)
                     char = struct_win.getch()
                     while char != 10:
@@ -668,15 +663,15 @@ def main(stdscr: 'curses.window') -> None:
 
                     if app_state.struct_eval:
                         eval_win.addstr(1, 1, f'{app_state.struct_eval}  len={(struct.calcsize(app_state.struct_eval))}')
-                elif keypress == 72:
-                     # jump back struct eval number of bytes
+                elif keypress == 91:
+                     # [ jump back struct eval number of bytes
                     if app_state.struct_eval:
                         new_position: int = app_state.data_offset - struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
                             app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
                             app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
-                elif keypress == 104:
-                    # jump struct eval number of bytes
+                elif keypress == 93:
+                    # ] jump struct eval number of bytes
                     if app_state.struct_eval:
                         new_position: int = app_state.data_offset + struct.calcsize(app_state.struct_eval)
                         if new_position < file_size:
@@ -685,7 +680,11 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == curses.KEY_RESIZE:
                     # window resize
                     screen_sizing = ScreenSizing(stdscr, file_size)
-                elif keypress == curses.KEY_F1:
+                elif keypress == 113:
+                    # q quit
+                    return
+                elif keypress == 104:
+                    # h Help
                     _show_help_window(screen_sizing)
                     stdscr.getch()
                     stdscr.refresh()
