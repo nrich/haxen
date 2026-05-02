@@ -3,7 +3,7 @@ Neil's hacking hex viewer
 
 ## Update
 
-haxen </path/to/file>
+**haxen** *</path/to/file>*
 
 ## Commands
 | Key | Description |
