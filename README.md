@@ -1,7 +1,11 @@
 # haxen
 Neil's hacking hex viewer
 
-## Key commands
+## Update
+
+haxen </path/to/file>
+
+## Commands
 | Key | Description |
 |---|---|
 | h | Open help window |
