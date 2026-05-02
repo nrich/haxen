@@ -271,11 +271,11 @@ def main(stdscr: 'curses.window') -> None:
 
     mark_win = curses.newwin(screen_sizing.mark_win_height, screen_sizing.mark_win_width, screen_sizing.data_win_height, screen_sizing.dump_win_width)
     mark_win.box()
-    mark_win.addstr(0, (screen_sizing.mark_win_width // 2) - 4, 'File marks')
+    mark_win.addstr(0, (screen_sizing.mark_win_width // 2) - 5, 'File marks')
 
     eval_win = curses.newwin(screen_sizing.eval_win_height, screen_sizing.eval_win_width, screen_sizing.data_win_height+screen_sizing.mark_win_height, screen_sizing.dump_win_width+0)
     eval_win.box()
-    eval_win.addstr(0, (screen_sizing.eval_win_width // 2) - 4, 'Eval')
+    eval_win.addstr(0, (screen_sizing.eval_win_width // 2) - 2, 'Eval')
 
     # Refresh to display changes
     stdscr.refresh()
@@ -292,7 +292,7 @@ def main(stdscr: 'curses.window') -> None:
         with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as fm:
             while True:
                 dump_win.box() # Uses default characters
-                dump_win.addstr(0, screen_sizing.dump_win_width//2, os.path.basename(args.binfile))
+                dump_win.addstr(0, screen_sizing.dump_win_width//2 - len(os.path.basename(args.binfile))//2, os.path.basename(args.binfile))
                 dump_win.addstr(screen_sizing.dump_win_height-1, 4, f' 0x{app_state.data_offset:X}/0x{file_size:X}  {math.floor(((app_state.data_offset/file_size) * 100) + 0.5):3d}%')
 
                 data_win.box()
