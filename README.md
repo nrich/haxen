@@ -1,7 +1,7 @@
 # haxen
 Neil's hacking hex viewer
 
-## Update
+## Usage
 
 **haxen** *</path/to/file>*
 
