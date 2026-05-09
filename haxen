@@ -307,11 +307,25 @@ class ApplicationState:
         self.marks: List[int] = []
 
         self.display_mode: int = DISPLAY_ASCII
+
     @property
     def data_offset(self) -> int:
         """The actual offset in file."""
         return self.file_offset + self.cursor_position
 
+    @property
+    def search_term(self) -> bytes:
+        if self.mode == MODE_HEX:
+            return self.hex_search
+
+        return self.ascii_search
+
+    @search_term.setter
+    def search_term(self, value: bytes) -> bytes:
+        if self.mode == MODE_HEX:
+            self.hex_search = value
+
+        self.ascii_search = value
 
 def _show_help_window(screen_sizing: ScreenSizing):
     help_win = curses.newwin(screen_sizing.help_win_height, screen_sizing.help_win_width, screen_sizing.help_win_y, screen_sizing.help_win_x)
@@ -349,6 +363,62 @@ def _show_help_window(screen_sizing: ScreenSizing):
         help_win.addstr(3+i, 20, message)
 
     help_win.refresh()
+
+def _show_search_window(screen_sizing: ScreenSizing, title: str, prompt: str) -> bytes:
+    title_x: int = 30 - len(title)//2
+
+    search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
+    search_win.box()
+    search_win.addstr(0, title_x, title)
+    search_win.addstr(1, 2, prompt)
+    search_win.refresh()
+
+    try:
+        curses.echo()
+        search_term = search_win.getstr()
+    finally:
+        curses.noecho()
+
+    search_win.erase()
+    return search_term
+
+def _run_search(app_state: ApplicationState, screen_sizing: ScreenSizing, fm: mmap.mmap, file_size: int, search_block_size: int) -> None:
+    search_start_position: int = app_state.data_offset + 1
+    search_stop_position: int = search_start_position + search_block_size
+
+    spinner = _spinning_cursor()
+
+    search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
+    search_progress_win.box()
+    search_progress_win.addstr(0, 24, "Searching...")
+
+    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
+    search_progress_win.refresh()
+
+    try:
+        new_position = fm.find(app_state.search_term, search_start_position, search_stop_position)
+        while new_position == -1:
+            search_start_position = search_stop_position
+            if search_start_position > file_size:
+                break
+
+            search_stop_position = search_start_position + search_block_size
+            new_position = fm.find(app_state.search_term, search_start_position, search_stop_position)
+            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
+            search_progress_win.refresh()
+
+        if new_position != -1:
+            app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
+            app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
+        else:
+            search_progress_win.addstr(1, 2, " " * 57)
+            search_progress_win.addstr(1, 2, "Not found.")
+            search_progress_win.getch()
+    except KeyboardInterrupt:
+        app_state.search_term = b''
+        search_progress_win.addstr(1, 2, " " * 57)
+        search_progress_win.addstr(1, 2, "Search cancelled.")
+        search_progress_win.getch()
 
 
 def main(stdscr: 'curses.window') -> None:
@@ -611,114 +681,21 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 47:
                     # / search
                     if app_state.mode == MODE_ASCII:
-                        search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                        search_win.box()
-                        search_win.addstr(0, 19, "ASCII string to search")
-                        search_win.addstr(1, 2, "")
-                        search_win.refresh()
-
-                        curses.echo()
-                        new_ascii_search = search_win.getstr()
+                        new_ascii_search: bytes = _show_search_window(screen_sizing, "ASCII string to search", "")
                         if new_ascii_search:
-                            app_state.ascii_search = new_ascii_search
-                        curses.noecho()
+                            app_state.search_term = new_ascii_search
 
-                        search_start_position: int = app_state.data_offset + 1
-                        search_stop_position: int = search_start_position + search_block_size
 
-                        search_win.erase()
                         if app_state.ascii_search:
-                            spinner = _spinning_cursor()
-
-                            search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                            search_progress_win.box()
-                            search_progress_win.addstr(0, 24, "Searching...")
-
-                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
-                            search_progress_win.refresh()
-
-                            try:
-                                new_position = fm.find(app_state.ascii_search, search_start_position, search_stop_position)
-                                while new_position == -1:
-                                    search_start_position = search_stop_position
-                                    if search_start_position > file_size:
-                                        break
-
-                                    search_stop_position = search_start_position + search_block_size
-                                    new_position = fm.find(app_state.ascii_search, search_start_position, search_stop_position)
-                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
-                                    search_progress_win.refresh()
-
-                                if new_position != -1:
-                                    app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
-                                    app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
-                                else:
-                                    search_progress_win.addstr(1, 2, " " * 57)
-                                    search_progress_win.addstr(1, 2, "Not found.")
-                                    search_progress_win.getch()
-                            except KeyboardInterrupt:
-                                app_state.ascii_search = ''
-                                search_progress_win.addstr(1, 2, " " * 57)
-                                search_progress_win.addstr(1, 2, "Search cancelled.")
-                                search_progress_win.getch()
-
-
+                            _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
                     else:
-                        search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                        search_win.box()
-                        search_win.addstr(0, 20, "Hex value to search")
-                        search_win.addstr(1, 2, "0x")
-                        search_win.refresh()
-
-                        curses.echo()
-                        new_hex_search = search_win.getstr()
+                        new_hex_search: bytes = _show_search_window(screen_sizing, "Hex value to search", "0x")
                         if new_hex_search:
                             try:
-                                app_state.hex_search = bytes.fromhex(new_hex_search.decode('ascii'))
+                                app_state.search_term = bytes.fromhex(new_hex_search.decode('ascii'))
+                                _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
                             except:
-                                app_state.hex_search = b''
-                        curses.noecho()
-
-
-                        search_start_position: int = app_state.data_offset + 1
-                        search_stop_position: int = search_start_position + search_block_size
-
-                        search_win.erase()
-                        if app_state.hex_search:
-                            spinner = _spinning_cursor()
-
-                            search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                            search_progress_win.box()
-                            search_progress_win.addstr(0, 24, "Searching...")
-
-                            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
-                            search_progress_win.refresh()
-
-                            try:
-                                new_position = fm.find(app_state.hex_search, search_start_position, search_stop_position)
-                                while new_position == -1:
-                                    search_start_position = search_stop_position
-                                    if search_start_position > file_size:
-                                        break
-
-                                    search_stop_position = search_start_position + search_block_size
-                                    new_position = fm.find(app_state.hex_search, search_start_position, search_stop_position)
-                                    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
-                                    search_progress_win.refresh()
-
-                                if new_position != -1:
-                                    app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
-                                    app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
-                                else:
-                                    search_progress_win.addstr(1, 2, " " * 57)
-                                    search_progress_win.addstr(1, 2, "Not found.")
-                                    search_progress_win.getch()
-                            except KeyboardInterrupt:
-                                app_state.hex_search = b''
-                                search_progress_win.addstr(1, 2, " " * 57)
-                                search_progress_win.addstr(1, 2, "Search cancelled.")
-                                search_progress_win.getch()
-
+                                app_state.search_term = b''
 
                 elif keypress == 108:
                     # l toggle big/little endian display
