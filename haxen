@@ -367,10 +367,10 @@ def _show_help_window(screen_sizing: ScreenSizing):
 def _show_search_window(screen_sizing: ScreenSizing, title: str, prompt: str) -> bytes:
     title_x: int = 30 - len(title)//2
 
-    search_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
+    search_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 2, screen_sizing.dump_win_width//2 - 30)
     search_win.box()
     search_win.addstr(0, title_x, title)
-    search_win.addstr(1, 2, prompt)
+    search_win.addstr(2, 2, prompt)
     search_win.refresh()
 
     try:
@@ -388,11 +388,11 @@ def _run_search(app_state: ApplicationState, screen_sizing: ScreenSizing, fm: mm
 
     spinner = _spinning_cursor()
 
-    search_progress_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
+    search_progress_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 2, screen_sizing.dump_win_width//2 - 30)
     search_progress_win.box()
     search_progress_win.addstr(0, 24, "Searching...")
 
-    search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
+    search_progress_win.addstr(2, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
     search_progress_win.refresh()
 
     try:
@@ -404,20 +404,20 @@ def _run_search(app_state: ApplicationState, screen_sizing: ScreenSizing, fm: mm
 
             search_stop_position = search_start_position + search_block_size
             new_position = fm.find(app_state.search_term, search_start_position, search_stop_position)
-            search_progress_win.addstr(1, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
+            search_progress_win.addstr(2, 2, f"{next(spinner)} 0x{search_start_position:0{screen_sizing.offset_address_size}X}/0x{file_size:0{screen_sizing.offset_address_size}X}")
             search_progress_win.refresh()
 
         if new_position != -1:
             app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
             app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
         else:
-            search_progress_win.addstr(1, 2, " " * 57)
-            search_progress_win.addstr(1, 2, "Not found.")
+            search_progress_win.addstr(2, 2, " " * 57)
+            search_progress_win.addstr(2, 2, "Not found.")
             search_progress_win.getch()
     except KeyboardInterrupt:
         app_state.search_term = b''
-        search_progress_win.addstr(1, 2, " " * 57)
-        search_progress_win.addstr(1, 2, "Search cancelled.")
+        search_progress_win.addstr(2, 2, " " * 57)
+        search_progress_win.addstr(2, 2, "Search cancelled.")
         search_progress_win.getch()
 
 
