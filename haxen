@@ -298,8 +298,7 @@ class ApplicationState:
 
         self.marks: List[int] = []
 
-        #self.display_mode: int = DISPLAY_ASCII
-        self.display_mode: int = DISPLAY_EBCDIC
+        self.display_mode: int = DISPLAY_ASCII
     @property
     def data_offset(self) -> int:
         """The actual offset in file."""
