@@ -16,6 +16,9 @@ from typing import List,Tuple
 MODE_HEX: int = 0
 MODE_ASCII: int = 1
 
+DISPLAY_ASCII: int = 0
+DISPLAY_EBCDIC: int = 1
+
 def _parse_data_size(arg: str) -> int:
     size = arg
 
@@ -39,10 +42,14 @@ def _buffer_as_spaced_hex(buffer: bytes) -> str:
 
     return "  ".join(chunks)
 
-def _buffer_as_printable(buffer: bytes) -> str:
+def _buffer_as_printable(buffer: bytes, display_mode: int) -> str:
     allowed = bytearray(b'0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ ')
 
-    return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
+    if display_mode == DISPLAY_EBCDIC:
+        allowed = allowed.decode('utf8')
+        return "".join([c if c in allowed else '.' for c in buffer.decode('cp500')])
+    else:
+        return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
 
 def _index_to_position(idx: int, bytes_per_line: int, left_offset: int) -> Tuple[int, int]:
     y = idx // bytes_per_line
@@ -197,6 +204,8 @@ class ApplicationState:
 
         self.marks: List[int] = []
 
+        #self.display_mode: int = DISPLAY_ASCII
+        self.display_mode: int = DISPLAY_EBCDIC
     @property
     def data_offset(self) -> int:
         """The actual offset in file."""
@@ -223,6 +232,7 @@ def _show_help_window(screen_sizing: ScreenSizing):
         ("n", "Jump to next file mark"),
         ("N", "Jump to previous file mark"),
         ("l", "Toggle between little and big endian display mode"),
+        ("c", "Cycle between character encoding (ASCII, EBCDIC)"),
         ("s", "Set struct eval pattern $STRUCT"),
         ("[", "Jump forward sizeof($STRUCT) bytes"),
         ("]", "Jump backward sizeof($STRUCT) bytes"),
@@ -281,7 +291,7 @@ def main(stdscr: 'curses.window') -> None:
             while True:
                 dump_win.box() # Uses default characters
                 dump_win.addstr(0, screen_sizing.dump_win_width//2 - len(os.path.basename(args.binfile))//2, os.path.basename(args.binfile))
-                dump_win.addstr(screen_sizing.dump_win_height-1, 4, f' 0x{app_state.data_offset:X}/0x{file_size:X}  {math.floor(((app_state.data_offset/file_size) * 100) + 0.5):3d}%')
+                dump_win.addstr(screen_sizing.dump_win_height-1, 4, f' 0x{app_state.data_offset:X}/0x{file_size:X}  {math.floor(((app_state.data_offset/file_size) * 100) + 0.5):3d}% ')
 
                 data_win.box()
                 data_win.addstr(0, (screen_sizing.data_win_width//2) - 4, f'Data ({app_state.byteorder})')
@@ -300,16 +310,21 @@ def main(stdscr: 'curses.window') -> None:
                     hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
                     dump_win.addstr(i+1, 1, f'{offset:0{screen_sizing.offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
-                    dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_printable(hex_data)}')
+                    dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_printable(hex_data, app_state.display_mode)}')
 
                 if app_state.mode == MODE_HEX:
                     sy, sx = _index_to_ascii_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
-                    dump_win.addstr(sy, sx, _buffer_as_printable(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
+                    dump_win.addstr(sy, sx, _buffer_as_printable(fm[real_position:real_position+1], app_state.display_mode), curses.A_BOLD|curses.A_UNDERLINE)
                 else:
                     sy, sx = _index_to_position(app_state.cursor_position, screen_sizing.bytes_per_line, screen_sizing.offset_address_size)
                     real_position: int = app_state.data_offset
                     dump_win.addstr(sy, sx, _buffer_as_spaced_hex(fm[real_position:real_position+1]), curses.A_BOLD|curses.A_UNDERLINE)
+
+                if app_state.display_mode == DISPLAY_EBCDIC:
+                    dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-11, " EBCDIC ")
+                else:
+                    dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-11, " ASCII ")
 
                 int8 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+1], byteorder=app_state.byteorder, signed=True)
                 uint8 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+1], byteorder=app_state.byteorder, signed=False)
@@ -350,7 +365,7 @@ def main(stdscr: 'curses.window') -> None:
                         for i,data in enumerate(eval_data):
                             if isinstance(data, bytes):
                                 eval_win.addstr(2+i, 1, ' ' * (screen_sizing.eval_win_width-4))
-                                eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_printable(data)}')
+                                eval_win.addstr(2+i, 1, f'{i:<3d} {_buffer_as_printable(data, app_state.display_mode)}')
                             else:
                                 eval_win.addstr(2+i, 1, f'{i:<3d} {data:<{screen_sizing.eval_win_width-8}d}')
                     except:
@@ -371,7 +386,6 @@ def main(stdscr: 'curses.window') -> None:
                         app_state.cursor_position += screen_sizing.bytes_per_line
                 elif keypress == curses.KEY_UP:
                     # up
-
                     if cy < 2:
                         app_state.file_offset -= screen_sizing.bytes_per_line
                     else:
@@ -601,6 +615,12 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 108:
                     # l toggle big/little endian display
                     app_state.byteorder = 'little' if app_state.byteorder == 'big' else 'big'
+                elif keypress == 99:
+                    # c cycle character display mode
+                    if app_state.display_mode == DISPLAY_ASCII:
+                        app_state.display_mode = DISPLAY_EBCDIC
+                    else:
+                        app_state.display_mode = DISPLAY_ASCII
                 elif keypress == 109:
                     # m add file mark
                     if app_state.data_offset not in app_state.marks:
