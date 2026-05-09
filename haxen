@@ -740,10 +740,10 @@ def main(stdscr: 'curses.window') -> None:
                         app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
                 elif keypress == 115:
                     # s struct eval
-                    struct_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
+                    struct_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 3, screen_sizing.dump_win_width//2 - 30)
                     struct_win.box()
                     struct_win.addstr(0, 23, "Struct Pattern")
-                    struct_win.addstr(1, 2, app_state.struct_eval)
+                    struct_win.addstr(2, 2, app_state.struct_eval)
                     char = struct_win.getch()
                     while char != 10:
                         if char == 127:
@@ -751,12 +751,19 @@ def main(stdscr: 'curses.window') -> None:
                                 app_state.struct_eval = app_state.struct_eval[:-1]
                         else:
                             app_state.struct_eval += chr(char)
-                        struct_win.addstr(1, 2 + len(app_state.struct_eval), ' ')
-                        struct_win.addstr(1, 2, app_state.struct_eval)
+                        struct_win.addstr(2, 2 + len(app_state.struct_eval), ' ')
+                        struct_win.addstr(2, 2, app_state.struct_eval)
                         char = struct_win.getch()
 
                     if app_state.struct_eval:
-                        eval_win.addstr(1, 1, f'{app_state.struct_eval}  len={(struct.calcsize(app_state.struct_eval))}')
+                        try:
+                            eval_win.addstr(1, 1, f'{app_state.struct_eval}  len={(struct.calcsize(app_state.struct_eval))}')
+                        except:
+                            struct_win.addstr(2, 2, "Invalid struct pattern!")
+                            char = struct_win.getch()
+
+                            app_state.struct_eval = ''
+
                 elif keypress == 91:
                      # [ jump back struct eval number of bytes
                     if app_state.struct_eval:
