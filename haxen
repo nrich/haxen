@@ -357,7 +357,6 @@ def _show_help_window(screen_sizing: ScreenSizing):
         ("q", "Quit"),
     ]
 
-
     for i, (keypress, message) in enumerate(help_messages):
         help_win.addstr(3+i, 4, keypress)
         help_win.addstr(3+i, 20, message)
@@ -797,7 +796,6 @@ def main(stdscr: 'curses.window') -> None:
                 app_state.cursor_position = min(app_state.cursor_position, file_size)
                 app_state.file_offset = max(app_state.file_offset, 0)
                 app_state.file_offset = min(app_state.file_offset, file_size - (file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)))
-
 
 if __name__ == "__main__":
     try:
