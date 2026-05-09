@@ -20,6 +20,7 @@ DISPLAY_ASCII: int = 0
 DISPLAY_EBCDIC: int = 1
 DISPLAY_SQUOZE: int = 2
 DISPLAY_RADIX: int = 3
+DISPLAY_DEC_6BIT: int = 4
 
 SQUOZE: Dict[int, str] = {
     0x00: ' ',
@@ -109,6 +110,8 @@ RADIX50: Dict[int, str] = {
     0x27: '%',
 }
 
+DEC_6BIT: Dict[int, str] = {x-32: chr(x) for x in range(32, 95)}
+
 def _parse_data_size(arg: str) -> int:
     size = arg
 
@@ -129,7 +132,6 @@ def _buffer_as_spaced_hex(buffer: bytes) -> str:
     for i in range(0, len(buffer), 4):
         chunks.append(" ".join([f'{b & 0xff:02X}' for b in list(buffer[i:i+4])]))
 
-
     return "  ".join(chunks)
 
 def _buffer_as_printable(buffer: bytes, display_mode: int) -> str:
@@ -142,6 +144,8 @@ def _buffer_as_printable(buffer: bytes, display_mode: int) -> str:
         return "".join([SQUOZE[b] if b in SQUOZE else '.' for b in list(buffer)])
     elif display_mode == DISPLAY_RADIX:
         return "".join([RADIX50[b] if b in RADIX50 else '.' for b in list(buffer)])
+    elif display_mode == DISPLAY_DEC_6BIT:
+        return "".join([DEC_6BIT[b] if b in DEC_6BIT else '.' for b in list(buffer)])
     else:
         return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
 
@@ -326,7 +330,7 @@ def _show_help_window(screen_sizing: ScreenSizing):
         ("N", "Jump to previous file mark"),
         ("l", "Toggle between little and big endian display mode"),
         ("c", "Cycle between character encoding (ASCII, EBCDIC)"),
-        ("C", "Cycle between archaic character encoding (ASCII, SQUOZE, RADIX-50)"),
+        ("C", "Cycle between archaic character encoding (SQUOZE, RADIX 50, DEC 6BIT)"),
         ("s", "Set struct eval pattern $STRUCT"),
         ("[", "Jump forward sizeof($STRUCT) bytes"),
         ("]", "Jump backward sizeof($STRUCT) bytes"),
@@ -420,7 +424,9 @@ def main(stdscr: 'curses.window') -> None:
                 elif app_state.display_mode == DISPLAY_SQUOZE:
                     dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-13, " SQUOZE ")
                 elif app_state.display_mode == DISPLAY_RADIX:
-                    dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-13, " RADIX-50 ")
+                    dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-13, " RADIX 50 ")
+                elif app_state.display_mode == DISPLAY_DEC_6BIT:
+                    dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-13, " DEC 6BIT ")
                 else:
                     dump_win.addstr(screen_sizing.dump_win_height-1, screen_sizing.dump_win_width-13, " ASCII ")
 
@@ -721,10 +727,12 @@ def main(stdscr: 'curses.window') -> None:
                         app_state.display_mode = DISPLAY_ASCII
                 elif keypress == 67:
                     # C cycle archaic character display mode
-                    if app_state.display_mode == DISPLAY_ASCII:
+                    if app_state.display_mode in [DISPLAY_ASCII, DISPLAY_EBCDIC]:
                         app_state.display_mode = DISPLAY_SQUOZE
                     elif app_state.display_mode == DISPLAY_SQUOZE:
                         app_state.display_mode = DISPLAY_RADIX
+                    elif app_state.display_mode == DISPLAY_RADIX:
+                        app_state.display_mode = DISPLAY_DEC_6BIT
                     else:
                         app_state.display_mode = DISPLAY_ASCII
 
