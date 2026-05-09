@@ -367,7 +367,7 @@ def _show_help_window(screen_sizing: ScreenSizing):
 def _show_search_window(screen_sizing: ScreenSizing, title: str, prompt: str) -> bytes:
     title_x: int = 30 - len(title)//2
 
-    search_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 2, screen_sizing.dump_win_width//2 - 30)
+    search_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 3, screen_sizing.dump_win_width//2 - 30)
     search_win.box()
     search_win.addstr(0, title_x, title)
     search_win.addstr(2, 2, prompt)
@@ -388,7 +388,7 @@ def _run_search(app_state: ApplicationState, screen_sizing: ScreenSizing, fm: mm
 
     spinner = _spinning_cursor()
 
-    search_progress_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 2, screen_sizing.dump_win_width//2 - 30)
+    search_progress_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 3, screen_sizing.dump_win_width//2 - 30)
     search_progress_win.box()
     search_progress_win.addstr(0, 24, "Searching...")
 
@@ -420,6 +420,23 @@ def _run_search(app_state: ApplicationState, screen_sizing: ScreenSizing, fm: mm
         search_progress_win.addstr(2, 2, "Search cancelled.")
         search_progress_win.getch()
 
+def _set_jump_offset(screen_sizing: ScreenSizing, title: str, prompt: str, base: int) -> None:
+    title_x: int = 30 - len(title)//2
+
+    jump_win = curses.newwin(5, 60, screen_sizing.dump_win_height//2 - 3, screen_sizing.dump_win_width//2 - 30)
+    jump_win.box()
+    jump_win.addstr(0, title_x, title)
+    jump_win.addstr(2, 2, prompt)
+    jump_win.refresh()
+
+    curses.echo()
+    location = jump_win.getstr()
+    curses.noecho()
+
+    try:
+        return int(location, base)
+    except:
+        return 0
 
 def main(stdscr: 'curses.window') -> None:
     """The main entry point."""
@@ -639,36 +656,10 @@ def main(stdscr: 'curses.window') -> None:
                         pass
                 elif keypress == 106:
                     # j set jump
-                    jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                    jump_win.box()
-                    jump_win.addstr(0, 22, "Set Jump Offset")
-                    jump_win.addstr(1, 2, "")
-                    jump_win.refresh()
-
-                    curses.echo()
-                    location = jump_win.getstr()
-                    curses.noecho()
-
-                    try:
-                        app_state.jump_offset = int(location, 10)
-                    except:
-                        app_state.jump_offset = 0
+                    app_state.jump_offset = _set_jump_offset(screen_sizing, "Set Jump Offset", "", 10)
                 elif keypress == 74:
                     # J set jump
-                    jump_win = curses.newwin(3, 60, screen_sizing.dump_win_height//2 - 1, screen_sizing.dump_win_width//2 - 30)
-                    jump_win.box()
-                    jump_win.addstr(0, 22, "Set Jump Offset")
-                    jump_win.addstr(1, 2, "0x")
-                    jump_win.refresh()
-
-                    curses.echo()
-                    location = jump_win.getstr()
-                    curses.noecho()
-
-                    try:
-                        app_state.jump_offset = int(location, 16)
-                    except:
-                        app_state.jump_offset = 0
+                    app_state.jump_offset = _set_jump_offset(screen_sizing, "Set Jump Offset", "0x", 16)
                 elif keypress == 32:
                     # SPACE repeat jump
                     try:
@@ -684,7 +675,6 @@ def main(stdscr: 'curses.window') -> None:
                         new_ascii_search: bytes = _show_search_window(screen_sizing, "ASCII string to search", "")
                         if new_ascii_search:
                             app_state.search_term = new_ascii_search
-
 
                         if app_state.ascii_search:
                             _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
