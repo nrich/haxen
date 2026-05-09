@@ -22,6 +22,8 @@ Neil's hacking hex viewer
 | n | Jump to next file mark |
 | N | Jump to previous file mark |
 | l | Toggle between little and big endian display mode |
+| c | Cycle between character encoding (ASCII, EBCDIC) |
+| C | Cycle between archaic character encoding (SQUOZE, RADIX 50, DEC 6BIT) |
 | s| Set struct eval pattern $STRUCT |
 | \[ | Jump forward sizeof($STRUCT) bytes |
 | \] | Jump backward sizeof($STRUCT) bytes |
