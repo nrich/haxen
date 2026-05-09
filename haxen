@@ -140,14 +140,18 @@ def _buffer_as_printable(buffer: bytes, display_mode: int) -> str:
     if display_mode == DISPLAY_EBCDIC:
         allowed = allowed.decode('utf8')
         return "".join([c if c in allowed else '.' for c in buffer.decode('cp500')])
-    elif display_mode == DISPLAY_SQUOZE:
+
+    if display_mode == DISPLAY_SQUOZE:
         return "".join([SQUOZE[b] if b in SQUOZE else '.' for b in list(buffer)])
-    elif display_mode == DISPLAY_RADIX:
+
+    if display_mode == DISPLAY_RADIX:
         return "".join([RADIX50[b] if b in RADIX50 else '.' for b in list(buffer)])
-    elif display_mode == DISPLAY_DEC_6BIT:
+
+    if display_mode == DISPLAY_DEC_6BIT:
         return "".join([DEC_6BIT[b] if b in DEC_6BIT else '.' for b in list(buffer)])
-    else:
-        return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
+
+    # default ASCII
+    return "".join([chr(b) if b in allowed else '.' for b in list(buffer)])
 
 def _index_to_position(idx: int, bytes_per_line: int, left_offset: int) -> Tuple[int, int]:
     y = idx // bytes_per_line
