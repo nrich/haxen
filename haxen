@@ -200,6 +200,8 @@ class ScreenSizing:
 
         if file_size > 2**32:
             self.offset_address_size: int = 12
+        if file_size < 2**16:
+            self.offset_address_size: int = 4
         else:
             self.offset_address_size: int = 8
 
