@@ -509,6 +509,7 @@ def main(stdscr: 'curses.window') -> None:
 
                     hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
+                    dump_win.addstr(i+1, 1, ' ' * (screen_sizing.dump_win_width-2))
                     dump_win.addstr(i+1, 1, f'{offset:0{screen_sizing.offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
                     dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_printable(hex_data, app_state.display_mode)}')
 
@@ -806,6 +807,11 @@ def main(stdscr: 'curses.window') -> None:
 
                 app_state.cursor_position = max(app_state.cursor_position, 0)
                 app_state.cursor_position = min(app_state.cursor_position, file_size)
+
+                if app_state.cursor_position+app_state.file_offset > file_size:
+                    app_state.cursor_position = file_size % app_state.file_offset
+                    stdscr.refresh()
+
                 app_state.file_offset = max(app_state.file_offset, 0)
                 app_state.file_offset = min(app_state.file_offset, file_size - (file_size % (screen_sizing.bytes_per_line * screen_sizing.dump_win_height-2)))
 
