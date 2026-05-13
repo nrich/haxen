@@ -513,7 +513,7 @@ def main(stdscr: 'curses.window') -> None:
 
                     hex_data = fm[offset:offset+screen_sizing.bytes_per_line]
 
-                    dump_win.addstr(i+1, 1, ' ' * (screen_sizing.dump_win_width-2))
+                    dump_win.addstr(i+1, screen_sizing.offset_address_size+3, ' ' * (screen_sizing.dump_win_width-screen_sizing.offset_address_size-4))
                     dump_win.addstr(i+1, 1, f'{offset:0{screen_sizing.offset_address_size}X}  {_buffer_as_spaced_hex(hex_data)}')
                     dump_win.addstr(i+1, screen_sizing.data_line_length+screen_sizing.offset_address_size+3, f'{_buffer_as_printable(hex_data, app_state.display_mode)}')
 
