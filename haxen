@@ -646,7 +646,7 @@ def main(stdscr: 'curses.window') -> None:
                     # > jump to end
                     app_state.file_offset = file_size // screen_sizing.bytes_per_screen * screen_sizing.bytes_per_screen
                     app_state.cursor_position = file_size % screen_sizing.bytes_per_screen
-                    app_state.cursor_position -= 1
+                    #app_state.cursor_position -= 1
                     dump_win.clear()
                 elif keypress == 10:
                     # ENTER Jump to position
