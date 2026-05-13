@@ -236,10 +236,20 @@ class ScreenSizing:
 
         bytes_per_line: int = (self.dump_win_width - self.offset_address_size) // 4
 
-        cy,_ =  _index_to_position(bytes_per_line, bytes_per_line, self.offset_address_size)
+        while True:
+            x = bytes_per_line
 
-        if cy > 1:
+            x = x * 3 + (x // 4)
+
+            x += self.offset_address_size + 3
+            x += bytes_per_line
+
+            if x <= self.dump_win_width:
+                break
+
             bytes_per_line -= 4
+            bytes_per_line -= (bytes_per_line % 4)
+
         bytes_per_line -= (bytes_per_line % 4)
 
         return bytes_per_line
