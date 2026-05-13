@@ -327,6 +327,8 @@ class ApplicationState:
 
     @property
     def search_term(self) -> bytes:
+        """Return search term based on mode."""
+
         if self.mode == MODE_HEX:
             return self.hex_search
 
@@ -803,10 +805,10 @@ def main(stdscr: 'curses.window') -> None:
                     _show_help_window(screen_sizing)
                     stdscr.getch()
                     stdscr.refresh()
-                elif keypress == curses.KEY_HOME or keypress == 362:
+                elif keypress in [curses.KEY_HOME or keypress, 362]:
                     # HOME start of line
                     app_state.cursor_position -= app_state.cursor_position % screen_sizing.bytes_per_line
-                elif keypress == curses.KEY_END or keypress == 385:
+                elif keypress in [curses.KEY_END, 385]:
                     # End end of line
                     app_state.cursor_position += screen_sizing.bytes_per_line - (app_state.cursor_position % screen_sizing.bytes_per_line) - 1
                 else:
