@@ -350,6 +350,8 @@ def _show_help_window(screen_sizing: ScreenSizing):
         ("ENTER", "Jump to absolute file postion"),
         ("PGUP", "Jump back one screen of data"),
         ("PGDN", "Jump forward one screen of data"),
+        ("HOME", "Jump to start of line"),
+        ("END", "Jump to end of line"),
         ("/", "Search for bytes in HEX mode, or string in ASCII mode"),
         ("j", "Set $JUMP_OFFSET count (as decimal)"),
         ("J", "Set $JUMP_OFFSET count (as hex)"),
@@ -801,6 +803,12 @@ def main(stdscr: 'curses.window') -> None:
                     _show_help_window(screen_sizing)
                     stdscr.getch()
                     stdscr.refresh()
+                elif keypress == curses.KEY_HOME or keypress == 362:
+                    # HOME start of line
+                    app_state.cursor_position -= app_state.cursor_position % screen_sizing.bytes_per_line
+                elif keypress == curses.KEY_END or keypress == 385:
+                    # End end of line
+                    app_state.cursor_position += screen_sizing.bytes_per_line - (app_state.cursor_position % screen_sizing.bytes_per_line) - 1
                 else:
                     if args.debug:
                         raise ValueError(keypress)
