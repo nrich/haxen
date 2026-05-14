@@ -225,8 +225,10 @@ class ScreenSizing:
 
         self.eval_win_width: int = 42
 
-        if file_size > 2**32:
+        if file_size > 2**40:
             self.offset_address_size: int = 12
+        elif file_size > 2**32:
+            self.offset_address_size: int = 10
         elif file_size < 2**16:
             self.offset_address_size: int = 4
         else:
@@ -279,7 +281,7 @@ class ScreenSizing:
             x += self.offset_address_size + 3
             x += bytes_per_line
 
-            if x <= self.dump_win_width:
+            if x < self.dump_win_width:
                 break
 
             bytes_per_line -= 1
@@ -327,8 +329,8 @@ class ScreenSizing:
         """Width of data window."""
         if self.help_win_height > self._height // 2:
             return self._height // 5
-        else:
-            return self._height // 4
+
+        return self._height // 4
 
     @property
     def help_win_x(self) -> int:
