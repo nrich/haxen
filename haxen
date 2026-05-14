@@ -112,6 +112,33 @@ RADIX50: Dict[int, str] = {
 
 DEC_6BIT: Dict[int, str] = {x-32: chr(x) for x in range(32, 95)}
 
+help_messages: List[Tuple[str, str]] = [
+    ("h", "Open help window"),
+    ("TAB", "Switch between HEX and ASCII mode"),
+    ("ENTER", "Jump to absolute file postion"),
+    ("PGUP", "Jump back one screen of data"),
+    ("PGDN", "Jump forward one screen of data"),
+    ("HOME", "Jump to start of line"),
+    ("END", "Jump to end of line"),
+    ("/", "Search for bytes in HEX mode, or string in ASCII mode"),
+    ("j", "Set $JUMP_OFFSET count (as decimal)"),
+    ("J", "Set $JUMP_OFFSET count (as hex)"),
+    ("SPACE", "Jump forward $JUMP_OFFSET bytes"),
+    ("m", "Create new file make at current cursor position"),
+    ("M", "Remove last created file mark"),
+    ("n", "Jump to next file mark"),
+    ("N", "Jump to previous file mark"),
+    ("l", "Toggle between little and big endian display mode"),
+    ("c", "Cycle between character encoding (ASCII, EBCDIC)"),
+    ("C", "Cycle between archaic character encoding (SQUOZE, RADIX 50, DEC 6BIT)"),
+    ("s", "Set struct eval pattern $STRUCT"),
+    ("[", "Jump forward sizeof($STRUCT) bytes"),
+    ("]", "Jump backward sizeof($STRUCT) bytes"),
+    ("<", "Jump to first byte of file"),
+    (">", "Jump to last byte of file"),
+    ("q", "Quit"),
+]
+
 def _parse_data_size(arg: str) -> int:
     size = arg
 
@@ -228,7 +255,15 @@ class ScreenSizing:
     @property
     def eval_win_height(self) -> int:
         """Height of struct pattern eval window."""
-        return self._height // 3
+
+        height: int = self._height // 3
+
+        height_diff: int = self._height - (self.mark_win_height + self.data_win_height + height)
+
+        if height_diff > 0:
+            height += height_diff
+
+        return height
 
     @property
     def bytes_per_line(self) -> int:
@@ -247,8 +282,7 @@ class ScreenSizing:
             if x <= self.dump_win_width:
                 break
 
-            bytes_per_line -= 4
-            bytes_per_line -= (bytes_per_line % 4)
+            bytes_per_line -= 1
 
         bytes_per_line -= (bytes_per_line % 4)
 
@@ -281,24 +315,25 @@ class ScreenSizing:
     @property
     def help_win_height(self) -> int:
         """Width of data window."""
-        return self._height // 2
+        return max(self._height // 2, len(help_messages)+4)
 
     @property
     def help_win_width(self) -> int:
         """Width of dump window."""
         return self._width // 2
 
-
     @property
     def help_win_y(self) -> int:
         """Width of data window."""
-        return self._height // 4
+        if self.help_win_height > self._height // 2:
+            return self._height // 5
+        else:
+            return self._height // 4
 
     @property
     def help_win_x(self) -> int:
         """Width of dump window."""
         return self._width // 4
-
 
 class ApplicationState:
     """Stores application state."""
@@ -346,36 +381,9 @@ def _show_help_window(screen_sizing: ScreenSizing):
     help_win.box()
     help_win.addstr(0, (screen_sizing.help_win_width // 2) - 2, "Help")
 
-    help_messages: List[Tuple[str, str]] = [
-        ("h", "Open help window"),
-        ("TAB", "Switch between HEX and ASCII mode"),
-        ("ENTER", "Jump to absolute file postion"),
-        ("PGUP", "Jump back one screen of data"),
-        ("PGDN", "Jump forward one screen of data"),
-        ("HOME", "Jump to start of line"),
-        ("END", "Jump to end of line"),
-        ("/", "Search for bytes in HEX mode, or string in ASCII mode"),
-        ("j", "Set $JUMP_OFFSET count (as decimal)"),
-        ("J", "Set $JUMP_OFFSET count (as hex)"),
-        ("SPACE", "Jump forward $JUMP_OFFSET bytes"),
-        ("m", "Create new file make at current cursor position"),
-        ("M", "Remove last created file mark"),
-        ("n", "Jump to next file mark"),
-        ("N", "Jump to previous file mark"),
-        ("l", "Toggle between little and big endian display mode"),
-        ("c", "Cycle between character encoding (ASCII, EBCDIC)"),
-        ("C", "Cycle between archaic character encoding (SQUOZE, RADIX 50, DEC 6BIT)"),
-        ("s", "Set struct eval pattern $STRUCT"),
-        ("[", "Jump forward sizeof($STRUCT) bytes"),
-        ("]", "Jump backward sizeof($STRUCT) bytes"),
-        ("<", "Jump to first byte of file"),
-        (">", "Jump to last byte of file"),
-        ("q", "Quit"),
-    ]
-
     for i, (keypress, message) in enumerate(help_messages):
-        help_win.addstr(3+i, 4, keypress)
-        help_win.addstr(3+i, 20, message)
+        help_win.addstr(2+i, 4, keypress)
+        help_win.addstr(2+i, 20, message)
 
     help_win.refresh()
 
