@@ -569,15 +569,6 @@ def main(stdscr: 'curses.window') -> None:
                 uint32 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+4], byteorder=app_state.byteorder, signed=False)
                 int64 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+8], byteorder=app_state.byteorder, signed=True)
                 uint64 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+8], byteorder=app_state.byteorder, signed=False)
-                try:
-                    [f32] = struct.unpack('f', fm[app_state.data_offset:app_state.data_offset+4])
-                except:
-                    f32 = 0.0
-
-                try:
-                    [f64] = struct.unpack('d', fm[app_state.data_offset:app_state.data_offset+8])
-                except:
-                    f64 = 0.0
 
 
                 data_win.addstr(1, 1, f'INT8    {int8:>32d}')
@@ -591,9 +582,17 @@ def main(stdscr: 'curses.window') -> None:
 
                 data_win.addstr(9, 1, ' ' * (screen_sizing.data_win_width-2))
                 data_win.addstr(10, 1, ' ' * (screen_sizing.data_win_width-2))
+                try:
+                    [f32] = struct.unpack('f', fm[app_state.data_offset:app_state.data_offset+4])
+                    data_win.addstr(9, 1,  f'F32     {_format_float(f32)}')
+                except:
+                    data_win.addstr(9, 1,  f'F32     {"ERR":>32s}')
 
-                data_win.addstr(9, 1,  f'F32     {_format_float(f32)}')
-                data_win.addstr(10, 1, f'F64     {_format_float(f64)}')
+                try:
+                    [f64] = struct.unpack('d', fm[app_state.data_offset:app_state.data_offset+8])
+                    data_win.addstr(10, 1,  f'F64     {_format_float(f64)}')
+                except:
+                    data_win.addstr(10, 1,  f'F64     {"ERR":>32s}')
 
                 data_win.addstr(11, 1, f'EPOCH   {datetime.datetime.fromtimestamp(uint32).strftime("%c"):>32}')
 
