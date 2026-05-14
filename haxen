@@ -463,6 +463,20 @@ def _set_jump_offset(screen_sizing: ScreenSizing, title: str, prompt: str, base:
     except:
         return 0
 
+def _format_float(f: float) -> str:
+    output_str_len = 31
+
+    int_format_len: str = len(format(int(f), "d"))
+    if int_format_len > output_str_len:
+        formatted: str = format(f, f" {output_str_len+1}e")
+    else:
+        if f < 0:
+            formatted: str = format(f, f"{int_format_len}.0{output_str_len-int_format_len-1}f")
+        else:
+            formatted: str = format(f, f" {int_format_len}.0{output_str_len-int_format_len-1}f")
+
+    return formatted
+
 def main(stdscr: 'curses.window') -> None:
     """The main entry point."""
     argparser = argparse.ArgumentParser()
@@ -555,8 +569,15 @@ def main(stdscr: 'curses.window') -> None:
                 uint32 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+4], byteorder=app_state.byteorder, signed=False)
                 int64 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+8], byteorder=app_state.byteorder, signed=True)
                 uint64 = int.from_bytes(fm[app_state.data_offset:app_state.data_offset+8], byteorder=app_state.byteorder, signed=False)
-                #[f32] = struct.unpack('f', fm[data_offset:data_offset+4])
-                #[f64] = struct.unpack('d', fm[data_offset:data_offset+8])
+                try:
+                    [f32] = struct.unpack('f', fm[app_state.data_offset:app_state.data_offset+4])
+                except:
+                    f32 = 0.0
+
+                try:
+                    [f64] = struct.unpack('d', fm[app_state.data_offset:app_state.data_offset+8])
+                except:
+                    f64 = 0.0
 
 
                 data_win.addstr(1, 1, f'INT8    {int8:>32d}')
@@ -567,11 +588,14 @@ def main(stdscr: 'curses.window') -> None:
                 data_win.addstr(6, 1, f'UINT32  {uint32:>32d}')
                 data_win.addstr(7, 1, f'INT64   {int64:>32d}')
                 data_win.addstr(8, 1, f'UINT64  {uint64:>32d}')
-                data_win.addstr(9, 1, f'EPOCH   {datetime.datetime.fromtimestamp(uint32).strftime("%c"):>32}')
 
-                #data_win.addstr(9, 1, f'F32     {f32:1.10f}')
-                #data_win.addstr(10, 1, f'F64     {str(f64)[:20]}')
+                data_win.addstr(9, 1, ' ' * (screen_sizing.data_win_width-2))
+                data_win.addstr(10, 1, ' ' * (screen_sizing.data_win_width-2))
 
+                data_win.addstr(9, 1,  f'F32     {_format_float(f32)}')
+                data_win.addstr(10, 1, f'F64     {_format_float(f64)}')
+
+                data_win.addstr(11, 1, f'EPOCH   {datetime.datetime.fromtimestamp(uint32).strftime("%c"):>32}')
 
                 mark_win.box()
                 mark_win.addstr(0, (screen_sizing.mark_win_width//2) - 4, 'File marks')
