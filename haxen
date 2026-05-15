@@ -475,6 +475,15 @@ def _format_float(f: float) -> str:
         else:
             formatted: str = format(f, f" {int_format_len}.0{output_str_len-int_format_len-1}f")
 
+        while len(formatted) < 32:
+            formatted += '0'
+
+        while formatted[-1] in ['0']:
+            formatted = ' ' + formatted[:-1]
+
+        if formatted[-1] == '.':
+            formatted = formatted[1:] + '0'
+
     return formatted
 
 def main(stdscr: 'curses.window') -> None:
