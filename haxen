@@ -780,9 +780,11 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 78:
                     # N jump to previous mark
                     if app_state.marks:
-                        next_positions: int = [mark for mark in app_state.marks if mark < app_state.data_offset]
+                        sorted_marks = sorted(app_state.marks)
 
-                        new_position: int = next_positions[-1] if next_positions else app_state.marks[-1]
+                        next_positions: int = [mark for mark in sorted_marks if mark < app_state.data_offset]
+
+                        new_position: int = next_positions[-1] if next_positions else sorted_marks[-1]
 
                         app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
                         app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
@@ -790,9 +792,11 @@ def main(stdscr: 'curses.window') -> None:
                 elif keypress == 110:
                     # n jump to next mark
                     if app_state.marks:
-                        next_positions: int = [mark for mark in app_state.marks if mark > app_state.data_offset]
+                        sorted_marks = sorted(app_state.marks)
 
-                        new_position: int = next_positions[0] if next_positions else app_state.marks[0]
+                        next_positions: int = [mark for mark in sorted_marks if mark > app_state.data_offset]
+
+                        new_position: int = next_positions[0] if next_positions else sorted_marks[0]
 
                         app_state.cursor_position = new_position % screen_sizing.bytes_per_screen
                         app_state.file_offset = (new_position // screen_sizing.bytes_per_screen) * screen_sizing.bytes_per_screen
