@@ -733,17 +733,16 @@ def main(stdscr: 'curses.window') -> None:
                         new_ascii_search: bytes = _show_search_window(screen_sizing, "ASCII string to search", "")
                         if new_ascii_search:
                             app_state.search_term = new_ascii_search
-
-                        if app_state.ascii_search:
-                            _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
                     else:
                         new_hex_search: bytes = _show_search_window(screen_sizing, "Hex value to search", "0x")
                         if new_hex_search:
                             try:
                                 app_state.search_term = bytes.fromhex(new_hex_search.decode('ascii'))
-                                _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
                             except:
                                 app_state.search_term = b''
+
+                    if app_state.search_term:
+                        _run_search(app_state, screen_sizing, fm, file_size, search_block_size)
 
                 elif keypress == 108:
                     # l toggle big/little endian display
