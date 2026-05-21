@@ -605,6 +605,13 @@ def main(stdscr: 'curses.window') -> None:
 
                 data_win.addstr(11, 1, f'EPOCH   {datetime.datetime.fromtimestamp(uint32).strftime("%c"):>32}')
 
+                try:
+                    encoding = 'utf-16le' if app_state.byteorder == 'little' else 'utf-16be'
+
+                    data_win.addstr(12, 1, f'UTF16  {fm[app_state.data_offset:app_state.data_offset+2].decode(encoding):>32s}')
+                except:
+                    data_win.addstr(12, 1, f'UTF16   {"ERR":>32s}')
+
                 mark_win.box()
                 mark_win.addstr(0, (screen_sizing.mark_win_width//2) - 4, 'File marks')
                 for i,mark in enumerate(app_state.marks):
